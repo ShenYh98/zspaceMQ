@@ -37,6 +37,14 @@ cd "$script_dir/build"
 
 # 根据输入的参数选择操作
 if [ -z "$2" ]; then
+  # 检查tmp目录是否存在，如果不存在则创建
+  if [ ! -d "tmp" ]; then
+      mkdir tmp
+  fi
+
+  # 递归遍历src/code目录下的所有.h文件，并复制到tmp目录
+  find $script_dir/src/code -type f \( -name "*.h" -o -name "*.hpp" \) -exec cp {} tmp \;
+
   if [ -z "$compiler" ]; then
     # 进行cmake构建
     cmake -DCMAKE_INSTALL_PREFIX=$install_dir -DCOMPILE_TYPE="$2" ..
@@ -50,7 +58,7 @@ if [ -z "$2" ]; then
       exit 1
     fi
   elif [ $compiler = "aarch64-linux-gnu-g++" ] || 
-      [ $compiler = "arm-linux-gnueabihf-g++" ]; then
+       [ $compiler = "arm-linux-gnueabihf-g++" ]; then
     # 使用交叉编译工具链进行编译
     # 确保交叉编译工具链已安装并位于正确的路径下
     if [ $compiler = "aarch64-linux-gnu-g++" ]; then

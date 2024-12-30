@@ -1,5 +1,0 @@
-syntax = "proto3";
- 
-message TopicSync {
-    repeated string v_topic = 1;
-}

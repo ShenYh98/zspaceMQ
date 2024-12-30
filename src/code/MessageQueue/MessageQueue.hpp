@@ -8,7 +8,7 @@
 #include <cstring>
 #include <sstream>
 
-#include "common/ThreadPool.h"
+#include "ThreadPool.h"
 
 /* posix通信相关 */
 #include <fcntl.h>
@@ -18,24 +18,19 @@
 #include <sys/wait.h>
 #include <sys/file.h>
 
-#define  MQ_THREAD_MAX     5
-#define  MQ_THREAD_MIN     1
+#define  MQ_THREAD_MAX     16
+#define  MQ_THREAD_MIN     8
 
-#define  MQ2_THREAD_MAX    128
-#define  MQ2_THREAD_MIN    64
+#define  MQ2_THREAD_MAX    16
+#define  MQ2_THREAD_MIN    8
 
-#define  SQ_THREAD_MAX     64
-#define  SQ_THREAD_MIN     60
+#define  SQ_THREAD_MAX     16
+#define  SQ_THREAD_MIN     8
 
-#define  MAX_TIME          5
+#define  SQ2_THREAD_MAX    16
+#define  SQ2_THREAD_MIN    8
 
 #define  INIT_SUB_PATH     "./tmp/init_sub_fifo"
-#define  RECV_WAIT_PATH    "./tmp/recv_wait_fifo"
-#define  FORK_LOCK_FILE    "example.lock"
-
-#define  WAIT_SUB_BUF_SIZE           2048
-#define  CHECK_SUB_BUF_SIZE          2048
-#define  RECV_SEND_TOPIC_BUF_SIZE    2048
 
 namespace CommonLib {
 
@@ -138,12 +133,6 @@ private:
 };
 
 /* 第二版线程及进程双通信的消息队列(线程进程间都可以通信) */
-typedef enum {
-    INIT,
-    WAIT,
-    RECV
-} SubInfo;
-
 class MessageHandle
 {
 private:
@@ -176,47 +165,19 @@ MessageHandle& messageHandle = MessageHandle::getInstance();
 
 template<typename Message>
 class MessageQueue2 {
-public:
+private:
     MessageQueue2() : 
         threadPool(MQ2_THREAD_MIN, MQ2_THREAD_MAX) , 
-        init_sub_path(INIT_SUB_PATH) ,
-        recv_wait_path(RECV_WAIT_PATH)
+        init_sub_path(INIT_SUB_PATH)
         {
         }
     MessageQueue2(const MessageQueue2&) = delete;
     MessageQueue2& operator=(const MessageQueue2&) = delete;
 
+public:
     static MessageQueue2<Message>& getInstance() {
         static MessageQueue2<Message> instance;
         return instance;
-    }
-
-    void initSubscribeInfo() {
-        fork_lk = open(FORK_LOCK_FILE, O_CREAT | O_RDWR, 0666);
-        if (fork_lk == -1) {
-            perror("open");
-            return ;
-        }
-    
-        if (lock_file(fork_lk) == -1) {
-            close(fork_lk);
-            return ;
-        }
-
-        int result = system("rm -rf ./tmp/*");
-        result = system("rm -rf /dev/mqueue/*");
-
-        threadPool.Add(std::bind(&MessageQueue2::pipeRead, this, std::placeholders::_1, std::placeholders::_2), init_sub_path, SubInfo::INIT);
-        threadPool.Add(std::bind(&MessageQueue2::pipeRead, this, std::placeholders::_1, std::placeholders::_2), recv_wait_path, SubInfo::RECV);
-        
-        std::this_thread::sleep_for(std::chrono::milliseconds(10));
-    }
-
-    void waitInit(const std::string node) {
-        std::string path = "./tmp/" + node;
-        pipeWrite(recv_wait_path, path);
-        pipeRead(path, SubInfo::WAIT);
-        messageHandle.setVTopic(this->v_recv_topic);
     }
 
     // 订阅在初始化处完成
@@ -228,6 +189,7 @@ public:
     // 发送在初始化处完成
     void publish(const std::string& topic, Message& data) {
         messageHandle.getVTopic(this->v_recv_topic);
+
         for (auto it : v_recv_topic) {
             if (matchTopic(it, topic)) {
                 client(it, data);
@@ -236,36 +198,6 @@ public:
     } 
 
 private:
-    // 创建进程的文件锁
-    int lock_file(int fd) {
-        struct flock fl;
-        fl.l_type = F_WRLCK;  // 排他锁
-        fl.l_whence = SEEK_SET;
-        fl.l_start = 0;
-        fl.l_len = 0; // 0表示锁住整个文件
-    
-        if (fcntl(fd, F_SETLK, &fl) == -1) {
-            perror("fcntl");
-            return -1;
-        }
-        return 0;
-    }
-    
-    // 创建进程的文件解锁
-    int unlock_file(int fd) {
-        struct flock fl;
-        fl.l_type = F_UNLCK;
-        fl.l_whence = SEEK_SET;
-        fl.l_start = 0;
-        fl.l_len = 0;
-    
-        if (fcntl(fd, F_SETLK, &fl) == -1) {
-            perror("fcntl");
-            return -1;
-        }
-        return 0;
-    }
-
     void client(const std::string& topic, Message& data) {
         // client
         try 
@@ -363,37 +295,6 @@ private:
         }
     }
 
-    void pipeRead(const std::string& fifo_path, const SubInfo& e_SubInfo) {
-        int fifo_fd = mkfifo(fifo_path.c_str(), 0666);
-        if (fifo_fd == -1) {
-            perror("mkfifo");
-            // return ;
-        }
-
-        fifo_fd = open(fifo_path.c_str(), O_RDONLY);
-        if (fifo_fd == -1) {
-            perror("open");
-            return ;
-        }
-
-        if (e_SubInfo == SubInfo::INIT) {
-            checkSubscribeInfo(fifo_fd);
-
-            // 初始化结束释放进程锁
-            if (unlock_file(fork_lk) == -1) {
-                close(fork_lk);
-                // exit(EXIT_FAILURE);
-            }
-            close(fork_lk);
-        } else if (e_SubInfo == SubInfo::WAIT) {
-            waitSubscribeInfo(fifo_fd);
-        } else if (e_SubInfo == SubInfo::RECV) {
-            recvSendTopicPath(fifo_fd);
-        }
-
-        close(fifo_fd);
-    }
-
     int pipeWrite(const std::string& fifo_path, const std::string& message) { 
         int fifo_fd = open(fifo_path.c_str(), O_WRONLY);
         if (fifo_fd == -1) {
@@ -406,112 +307,6 @@ private:
         close(fifo_fd);
 
         return 0;
-    }
-
-    void checkSubscribeInfo(int const& fifo_fd) {
-        // 在一定时间内,等待接收所有消息队列话题
-        struct timespec ts;
-        if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
-            std::cerr << "Error getting clock time" << std::endl;
-            return;
-        }
-
-        time_t startTime = ts.tv_sec;
-        time_t cur_time;
-
-        while (true) {
-            if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
-                std::cerr << "Error getting clock time" << std::endl;
-                return;
-            }
-            cur_time = ts.tv_sec;
-            size_t elapsed_seconds = cur_time - startTime;
-    
-            if (elapsed_seconds >= 10) {
-                break;
-            }
-
-            char buf[CHECK_SUB_BUF_SIZE];
-            ssize_t num_bytes = read(fifo_fd, buf, sizeof(buf) - 1);
-            if (num_bytes > 0) {
-                buf[num_bytes] = '\0';
-                std::string str(buf, num_bytes);
-                v_topic.push_back(str);
-
-                startTime = ts.tv_sec;
-            }
-        }
-
-        // 将收到的所有话题全部发出
-        Message vtopic;
-        for (auto it : v_topic) {
-            vtopic.add_v_topic(it);
-        }
-        std::string serialized_data;
-        vtopic.SerializeToString(&serialized_data);
-
-        for (auto it : v_wait_fifo_path) {
-            pipeWrite(it, serialized_data);
-        }
-    }
-
-    void waitSubscribeInfo(int const& fifo_fd) {
-        while (true) {
-            char buf[WAIT_SUB_BUF_SIZE];
-            ssize_t num_bytes = read(fifo_fd, buf, sizeof(buf));
-            if (num_bytes > 0) {
-                buf[num_bytes] = '\0';
-                std::string str(buf, num_bytes);
-
-                Message vtopic;
-                if (!vtopic.ParseFromString(str)) {
-                    std::cerr << "Failed to parse received message" << std::endl;
-                    close(fifo_fd);
-                    return;
-                }
-
-                for (int i = 0; i < vtopic.v_topic_size(); ++i) {
-                    v_recv_topic.push_back(vtopic.v_topic(i));
-                }
-
-                break;
-            }
-        }
-    }
-
-    void recvSendTopicPath(int const& fifo_fd) {
-        // 在一定时间内,等待接收所有wait管道的地址
-        struct timespec ts;
-        if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
-            std::cerr << "Error getting clock time" << std::endl;
-            return;
-        }
-
-        time_t startTime = ts.tv_sec;
-        time_t cur_time;
-
-        while (true) {
-            if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
-                std::cerr << "Error getting clock time" << std::endl;
-                return;
-            }
-            cur_time = ts.tv_sec;
-            size_t elapsed_seconds = cur_time - startTime;
-    
-            if (elapsed_seconds >= 10) {
-                break;
-            }
-
-            char buf[RECV_SEND_TOPIC_BUF_SIZE];
-            ssize_t num_bytes = read(fifo_fd, buf, sizeof(buf) - 1);
-            if (num_bytes > 0) {
-                buf[num_bytes] = '\0';
-                std::string str(buf, num_bytes);
-                v_wait_fifo_path.push_back(str);
-
-                startTime = ts.tv_sec;
-            }
-        }
     }
 
     bool matchTopic(const std::string& input, const std::string& pattern) {
@@ -538,25 +333,21 @@ private:
 
 private:
     ThreadPool threadPool;
-    std::vector<std::string> v_topic;           // 消息队列从订阅那儿接收的话题组
-    std::vector<std::string> v_recv_topic;      // 消息队列接收的话题组给发布使用
-    std::vector<std::string> v_wait_fifo_path;  // 进程等待管道组
+    std::vector<std::string> v_recv_topic;      // 用于接收所有订阅的话题
     std::mutex mutex;
-    std::string init_sub_path;   // 订阅初始化的管道路径
-    std::string recv_wait_path;  // 接收各个进程等待函数的管道路径
-
-    int fork_lk;
+    std::string init_sub_path;   // 通过这个管道路径,每当创建订阅,将其话题发给初始化函数
 };
 
 template<typename Message, typename Response>
 class ServiceQueue2 {
-public:
+private:
     ServiceQueue2() : 
-        threadPool(MQ2_THREAD_MIN, MQ2_THREAD_MAX)
+        threadPool(SQ2_THREAD_MIN, SQ2_THREAD_MAX)
     {}
     ServiceQueue2(const ServiceQueue2&) = delete;
     ServiceQueue2& operator=(const ServiceQueue2&) = delete;
 
+public:
     static ServiceQueue2<Message, Response>& getInstance() {
         static ServiceQueue2<Message, Response> instance;
         return instance;
@@ -650,14 +441,14 @@ private:
             attr.mq_curmsgs = 0;
     
             // 打开/创建请求队列
-            mqd_t request_mq = mq_open(request_queue_name.c_str(), O_CREAT | O_RDONLY, 0666, &attr);
+            mqd_t request_mq = mq_open(request_queue_name.c_str(), O_CREAT | O_RDONLY | O_EXCL , 0666, &attr);
             if (request_mq == -1) {
                 std::cerr << "3 Failed to open/create request message queue" << std::endl;
                 return;
             }
     
             // 打开/创建响应队列
-            mqd_t response_mq = mq_open(response_queue_name.c_str(), O_CREAT | O_WRONLY, 0666, &attr);
+            mqd_t response_mq = mq_open(response_queue_name.c_str(), O_CREAT | O_WRONLY | O_EXCL , 0666, &attr);
             if (response_mq == -1) {
                 std::cerr << "4 Failed to open/create response message queue" << std::endl;
                 mq_close(request_mq);

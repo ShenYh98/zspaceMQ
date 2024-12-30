@@ -27,26 +27,28 @@ set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -O0")
 
 # 递归添加源文件
 file(GLOB_RECURSE SOURCES 
+	${CMAKE_SOURCE_DIR}/src/code/*.hpp
 	${CMAKE_SOURCE_DIR}/src/code/*.cpp
 	${CMAKE_SOURCE_DIR}/src/code/*.c
 )
-
-# 添加头文件搜索路径
-include_directories(
-	${CMAKE_SOURCE_DIR}/src
-)
-
-# 生成库文件
-add_library(MagicChange SHARED ${SOURCES})
-
-# 链接库文件
-target_link_libraries(MagicChange PRIVATE pthread ${LIBRARIES})
 
 # 递归添加头文件，用于安装到指定目录
 file(GLOB_RECURSE INCLUDE
 	${CMAKE_SOURCE_DIR}/src/code/*.hpp
 	${CMAKE_SOURCE_DIR}/src/code/*.h
 )
+
+# 添加头文件搜索路径
+include_directories(
+	${CMAKE_SOURCE_DIR}/src
+	${CMAKE_SOURCE_DIR}/build/tmp
+)
+
+# 生成库文件
+add_library(MagicChange SHARED ${SOURCES})
+
+# 链接库文件
+target_link_libraries(MagicChange PRIVATE pthread)
 
 # 安装库文件到 lib 目录
 install(TARGETS MagicChange DESTINATION lib)
