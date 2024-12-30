@@ -7,7 +7,6 @@
 #include <fstream>
 #include <cstring>
 #include <sstream>
-#include <any>
 
 #include "common/ThreadPool.h"
 
@@ -100,12 +99,12 @@ public:
         return instance;
     }
     
-    void service_subscribe(const std::string& topic, const std::function<void(const Message&, std::function<void(const Response&)>)>& callback) {
+    void subscribe(const std::string& topic, const std::function<void(const Message&, std::function<void(const Response&)>)>& callback) {
         std::lock_guard<std::mutex> lock(mutex);
         responders.push_back({ topic, callback });
     }
 
-    std::future<Response> service_publish(const std::string& topic, const Message& message)  {
+    std::future<Response> publish(const std::string& topic, const Message& message)  {
         auto prom = std::make_shared<std::promise<Response>>();
         auto future = prom->get_future();
 
@@ -176,7 +175,7 @@ MessageHandle MessageHandle::instance_;
 MessageHandle& messageHandle = MessageHandle::getInstance();
 
 template<typename Message>
-class MessageQueue2 : public MessageQueue<Message> {
+class MessageQueue2 {
 public:
     MessageQueue2() : 
         threadPool(MQ2_THREAD_MIN, MQ2_THREAD_MAX) , 
@@ -547,6 +546,160 @@ private:
     std::string recv_wait_path;  // 接收各个进程等待函数的管道路径
 
     int fork_lk;
+};
+
+template<typename Message, typename Response>
+class ServiceQueue2 {
+public:
+    ServiceQueue2() : 
+        threadPool(MQ2_THREAD_MIN, MQ2_THREAD_MAX)
+    {}
+    ServiceQueue2(const ServiceQueue2&) = delete;
+    ServiceQueue2& operator=(const ServiceQueue2&) = delete;
+
+    static ServiceQueue2<Message, Response>& getInstance() {
+        static ServiceQueue2<Message, Response> instance;
+        return instance;
+    }
+
+    // 订阅在初始化处完成
+    void subscribe(const std::string& topic, const std::function<void(const Message&, Response&)>& callback) {
+        threadPool.Add(std::bind(&ServiceQueue2::server, this, std::placeholders::_1, std::placeholders::_2), topic, callback);
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+    }
+
+    // 发送在初始化处完成
+    Response publish(const std::string& topic, Message& data) {
+        auto res = client(topic, data);
+        return res;
+    } 
+
+private:
+    Response client(const std::string& topic, Message& request_data) {
+        try 
+        {
+            std::string request_queue_name = "/request_" + topic;
+            std::string response_queue_name = "/response_" + topic;
+            Response response_data;
+    
+            // 打开请求队列
+            mqd_t request_mq = mq_open(request_queue_name.c_str(), O_WRONLY | O_NONBLOCK);
+            if (request_mq == -1) {
+                std::cerr << "1 Failed to open/create request message queue" << std::endl;
+                return response_data;;
+            }
+    
+            // 序列化请求数据并发送
+            std::string serialized_request;
+            request_data.SerializeToString(&serialized_request);
+            if (mq_send(request_mq, serialized_request.c_str(), serialized_request.size() + 1, 0) == -1) {
+                std::cerr << "Failed to send request message" << std::endl;
+                mq_close(request_mq);
+                return response_data;;
+            }
+            mq_close(request_mq);
+    
+            // 打开响应队列
+            mqd_t response_mq = mq_open(response_queue_name.c_str(), O_RDONLY | O_NONBLOCK);
+            if (response_mq == -1) {
+                std::cerr << "2 Failed to open/create response message queue" << std::endl;
+                return response_data;
+            }
+    
+            // 等待并接收响应
+            char buffer[256];
+            ssize_t bytes_read;
+            while ((bytes_read = mq_receive(response_mq, buffer, 256, NULL)) == -1 && errno == EAGAIN) {
+                // 非阻塞模式下，如果队列为空，会立即返回 EAGAIN
+                std::this_thread::sleep_for(std::chrono::milliseconds(10));
+            }
+    
+            if (bytes_read >= 0) {
+                buffer[bytes_read] = '\0';
+
+                if (!response_data.ParseFromString(buffer)) {
+                    std::cerr << "Failed to parse received response" << std::endl;
+                } else {
+                    // std::cout << "Received response successfully" << std::endl;
+                }
+            } else {
+                std::cerr << "Failed to receive response" << std::endl;
+            }
+    
+            mq_close(response_mq);
+            return response_data;
+        } 
+        catch (const std::exception& exc) 
+        {
+            Response response_data;
+            std::cerr << "Client failed: " << exc.what() << std::endl;
+            return response_data;
+        }
+    }
+ 
+    void server(const std::string& topic, const std::function<void(const Message&, Response&)>& callback) {
+        try 
+        {
+            std::string request_queue_name = "/request_" + topic;
+            std::string response_queue_name = "/response_" + topic;
+    
+            struct mq_attr attr;
+            attr.mq_flags = 0;
+            attr.mq_maxmsg = 10;
+            attr.mq_msgsize = 256;
+            attr.mq_curmsgs = 0;
+    
+            // 打开/创建请求队列
+            mqd_t request_mq = mq_open(request_queue_name.c_str(), O_CREAT | O_RDONLY, 0666, &attr);
+            if (request_mq == -1) {
+                std::cerr << "3 Failed to open/create request message queue" << std::endl;
+                return;
+            }
+    
+            // 打开/创建响应队列
+            mqd_t response_mq = mq_open(response_queue_name.c_str(), O_CREAT | O_WRONLY, 0666, &attr);
+            if (response_mq == -1) {
+                std::cerr << "4 Failed to open/create response message queue" << std::endl;
+                mq_close(request_mq);
+                return;
+            }
+    
+            while (true) {
+                char request_buffer[256];
+                ssize_t bytes_read = mq_receive(request_mq, request_buffer, 256, NULL);
+                if (bytes_read >= 0) {
+                    request_buffer[bytes_read] = '\0';
+    
+                    Message request_data;
+                    Response response_data;
+                    if (request_data.ParseFromString(request_buffer)) {
+                        callback(request_data, response_data);
+    
+                        // 序列化响应数据并发送
+                        std::string serialized_response;
+                        response_data.SerializeToString(&serialized_response);
+                        if (mq_send(response_mq, serialized_response.c_str(), serialized_response.size() + 1, 0) == -1) {
+                            std::cerr << "Failed to send response message" << std::endl;
+                        }
+                    } else {
+                        std::cerr << "Failed to parse received request" << std::endl;
+                    }
+                } else {
+                    std::cerr << "Failed to receive request or queue is empty" << std::endl;
+                    std::this_thread::sleep_for(std::chrono::milliseconds(10));
+                }
+            }
+    
+            mq_close(request_mq);
+            mq_close(response_mq);
+        } 
+        catch (const std::exception& exc) 
+        {
+            std::cerr << "Server failed: " << exc.what() << std::endl;
+        }
+    }
+private:
+    ThreadPool threadPool;
 };
 
 }
