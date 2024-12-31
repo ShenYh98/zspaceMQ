@@ -1,6 +1,6 @@
 #include "InitMessageQueue.h"
 
-using namespace CommonLib;
+using namespace ProcessMessageQueue;
 
 void InitMessageQueue::initSubscribeInfo() {
     fork_lk = open(FORK_LOCK_FILE, O_CREAT | O_RDWR, 0666);
@@ -27,8 +27,8 @@ void InitMessageQueue::waitInit(const std::string node) {
     std::string path = "./tmp/" + node;
     pipeWrite(recv_wait_path, path);
     pipeRead(path, SubInfo::WAIT);
-    
-    messageHandle.setVTopic(this->v_recv_topic);
+
+    MessageHandle::getInstance().setVTopic(this->v_recv_topic);
 
     delete(threadPool);
 }
