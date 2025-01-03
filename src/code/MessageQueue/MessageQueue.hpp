@@ -20,16 +20,16 @@
 #include <sys/file.h>
 
 #define  MQ_THREAD_MAX     16
-#define  MQ_THREAD_MIN     8
-
-#define  MQ2_THREAD_MAX    16
-#define  MQ2_THREAD_MIN    8
+#define  MQ_THREAD_MIN     1
 
 #define  SQ_THREAD_MAX     16
-#define  SQ_THREAD_MIN     8
+#define  SQ_THREAD_MIN     1
+
+#define  MQ2_THREAD_MAX    16
+#define  MQ2_THREAD_MIN    1
 
 #define  SQ2_THREAD_MAX    16
-#define  SQ2_THREAD_MIN    8
+#define  SQ2_THREAD_MIN    1
 
 #define  INIT_SUB_PATH     "./tmp/init_sub_fifo"
 
@@ -48,7 +48,8 @@ namespace ThreadMessageQueue {
     template<typename Message, typename Response>
     struct Responder {
         std::string topic;
-        std::function<void(const Message&, std::function<void(const Response&)>)> callback;
+        std::function<void(const Message&, Response&)> callback;
+        void* trace;
     };
 
     // 生命周期管理类
@@ -132,8 +133,6 @@ namespace ThreadMessageQueue {
         }
 
     private:
-        std::thread mq_thread;
-    public:
         std::vector<Subscriber<Message>> subscribers;
         ThreadPool threadPool;
         std::mutex mutex;
@@ -151,41 +150,122 @@ namespace ThreadMessageQueue {
             static ServiceQueue<Message, Response> instance;
             return instance;
         }
-        
-        void subscribe(const std::string& topic, const std::function<void(const Message&, std::function<void(const Response&)>)>& callback) {
+
+        void subscribe(const std::string& topic, void* trace, const std::function<void(const Message&, Response&)>& callback) {
             std::lock_guard<std::mutex> lock(mutex);
-            responders.push_back({ topic, callback });
+            int match = 0;
+            for (auto responder : responders) {
+                // 服务队列的订阅是点对点的,只能存在一个话题,在订阅阶段将重复的话题过滤掉
+                if (responder.topic == topic) {
+                    match = 1;
+                    break;
+                }
+            }
+            if (!match) {
+                MessageHandle::getInstance().registerObject(trace); // 登录跟踪的类的指针
+                responders.push_back({ topic, callback, trace });
+            }
         }
 
-        std::future<Response> publish(const std::string& topic, const Message& message)  {
-            auto prom = std::make_shared<std::promise<Response>>();
-            auto future = prom->get_future();
+        Response publish(const std::string& topic, const Message& message) {
+            Response response;
 
-            std::function<void(const Message&, std::function<void(const Response&)>)> toCall;
+            std::function<void(const Message&, Response&)> toCall;
 
             {
                 std::lock_guard<std::mutex> lock(mutex);
+                // TODO 这里遍历太多,可能会影响性能,后期待优化
+                // 遍历服务队列订阅列表,如果跟踪对象不存在了,则删除订阅
+                for (auto responder = responders.begin(); responder != responders.end();) {
+                    if (!MessageHandle::getInstance().isObjectAlive(responder->trace)) {
+                        responders.erase(responder);
+                    } else {
+                        responder++;
+                    }
+                }
                 for (const auto& responder : responders) {
+                    // 服务队列是点对点的,一条订阅对应一个发布
                     if (responder.topic == topic) {
                         toCall = responder.callback;
-                        break;  // Assuming only one responder per topic for simplicity
+                        break;
                     }
                 }
             }
 
             if (toCall) {
-                threadPool.Add([&, callback=toCall, prom](const Message& msg) {
-                            callback(msg, [prom](const Response& resp) {
-                                prom->set_value(resp);
-                            });
-                        }, message);
+                toCall(message, response);
             }
 
-            return future;
+            return response;
+        }
+
+        // 加入超时判断,由于服务队列要等应答,如果订阅有死循环阻塞,则发布方会一直阻塞
+        Response publish(const std::string& topic, const int& timeout, const Message& message) {
+            Response response;
+            int trashTopicMatch = 0;
+
+            std::function<void(const Message&, Response&)> toCall;
+
+            {
+                std::lock_guard<std::mutex> lock(mutex);
+                // TODO 这里遍历太多,可能会影响性能,后期待优化
+                // 遍历服务队列订阅列表,如果跟踪对象不存在了,则删除订阅
+                for (auto responder = responders.begin(); responder != responders.end();) {
+                    if (!MessageHandle::getInstance().isObjectAlive(responder->trace)) {
+                        responders.erase(responder);
+                    } else {
+                        responder++;
+                    }
+                }
+                for (auto trashTopic : v_trashTopic) {
+                    if (trashTopic == topic) {
+                        trashTopicMatch = 1;
+                        break;
+                    }
+                }
+                if (!trashTopicMatch) {
+                    for (const auto& responder : responders) {
+                        // 服务队列是点对点的,一条订阅对应一个发布
+                        if (responder.topic == topic) {
+                            toCall = responder.callback;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            if (toCall) {
+                std::mutex cv_mutex;
+                std::condition_variable cv;
+                bool done = false;
+
+                threadPool.Add([&](){
+                    // 执行回调函数
+                    toCall(message, response);
+                    {
+                        std::lock_guard<std::mutex> lock(cv_mutex);
+                        done = true;
+                    }
+                    cv.notify_one();
+                });
+
+                // 等待回调函数完成或超时
+                {
+                    std::unique_lock<std::mutex> lock(cv_mutex);
+                    if (!cv.wait_for(lock, std::chrono::seconds(timeout), [&]() { return done; })) {
+                        // 超时，可以选择记录日志或处理超时情况
+                        v_trashTopic.push_back(topic);
+                        std::cerr << "Callback timed out!" << std::endl;
+                    }
+                }
+            }
+
+            return response;
         }
 
     private:
         std::vector<Responder<Message, Response>> responders;
+        std::vector<std::string> v_trashTopic; // 超时的订阅,将话题保存到垃圾话题队列
         ThreadPool threadPool;
         std::mutex mutex;
     };

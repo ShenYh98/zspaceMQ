@@ -13,6 +13,9 @@
 #define  CHECK_SUB_BUF_SIZE          2048
 #define  RECV_SEND_TOPIC_BUF_SIZE    2048
 
+#define  WAIT_TOPIC_TIME             10
+#define  WAIT_PIPE_TIME              10
+
 using namespace ProcessMessageQueue;
 
 namespace ProcessMessageQueue {
@@ -61,6 +64,8 @@ namespace ProcessMessageQueue {
         void recvSendTopicPath(int const& fifo_fd);
 
         std::vector<std::string> parseString(const char* str);
+
+        void execForPeriodTime(const size_t& time, std::function<void(time_t*)> callback);
 
     private:
         ThreadPool *threadPool;

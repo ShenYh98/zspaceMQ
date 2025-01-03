@@ -110,25 +110,11 @@ int InitMessageQueue::pipeWrite(const std::string& fifo_path, const std::string&
 
 void InitMessageQueue::checkSubscribeInfo(int const& fifo_fd) {
     // 在一定时间内,等待接收所有消息队列话题
-    struct timespec ts;
-    if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
-        std::cerr << "Error getting clock time" << std::endl;
-        return;
-    }
-
-    time_t startTime = ts.tv_sec;
-    time_t cur_time;
-
-    while (true) {
+    execForPeriodTime(WAIT_TOPIC_TIME, [&](time_t* startTime){
+        struct timespec ts;
         if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
             std::cerr << "Error getting clock time" << std::endl;
             return;
-        }
-        cur_time = ts.tv_sec;
-        size_t elapsed_seconds = cur_time - startTime;
-
-        if (elapsed_seconds >= 10) {
-            break;
         }
 
         char buf[CHECK_SUB_BUF_SIZE];
@@ -138,9 +124,9 @@ void InitMessageQueue::checkSubscribeInfo(int const& fifo_fd) {
             std::string str(buf, num_bytes);
             v_topic.push_back(str);
 
-            startTime = ts.tv_sec;
+            *startTime = ts.tv_sec;
         }
-    }
+    });
 
     // 将收到的所有话题全部发出
     std::string combinationTopic;
@@ -175,25 +161,11 @@ void InitMessageQueue::waitSubscribeInfo(int const& fifo_fd) {
 
 void InitMessageQueue::recvSendTopicPath(int const& fifo_fd) {
     // 在一定时间内,等待接收所有wait管道的地址
-    struct timespec ts;
-    if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
-        std::cerr << "Error getting clock time" << std::endl;
-        return;
-    }
-
-    time_t startTime = ts.tv_sec;
-    time_t cur_time;
-
-    while (true) {
+    execForPeriodTime(WAIT_PIPE_TIME, [&](time_t* startTime){
+        struct timespec ts;
         if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
             std::cerr << "Error getting clock time" << std::endl;
             return;
-        }
-        cur_time = ts.tv_sec;
-        size_t elapsed_seconds = cur_time - startTime;
-
-        if (elapsed_seconds >= 10) {
-            break;
         }
 
         char buf[RECV_SEND_TOPIC_BUF_SIZE];
@@ -203,9 +175,9 @@ void InitMessageQueue::recvSendTopicPath(int const& fifo_fd) {
             std::string str(buf, num_bytes);
             v_wait_fifo_path.push_back(str);
 
-            startTime = ts.tv_sec;
+            *startTime = ts.tv_sec;
         }
-    }
+    });
 }
 
 std::vector<std::string> InitMessageQueue::parseString(const char* str) {
@@ -230,4 +202,31 @@ std::vector<std::string> InitMessageQueue::parseString(const char* str) {
     }
 
     return result;
+}
+
+void InitMessageQueue::execForPeriodTime(const size_t& time, std::function<void(time_t*)> callback) {
+    struct timespec ts;
+    if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
+        std::cerr << "Error getting clock time" << std::endl;
+        return;
+    }
+ 
+    time_t startTime = ts.tv_sec;
+    time_t cur_time;
+ 
+    while (true) {
+        if (clock_gettime(CLOCK_REALTIME, &ts) == -1) {
+            std::cerr << "Error getting clock time" << std::endl;
+            return;
+        }
+        cur_time = ts.tv_sec;
+        size_t elapsed_seconds = cur_time - startTime;
+ 
+        if (elapsed_seconds >= time) {
+            break;
+        }
+
+        // 执行回调函数
+        callback(&startTime);
+    }
 }

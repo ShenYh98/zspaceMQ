@@ -21,12 +21,13 @@ namespace ThreadMessageQueue {
             return instance;
         }
 
+        // TODO 线程初始化消息队列暂时用不到,后期补充
         void initSubscribeInfo();
 
         void destroySubscribe (void* obj);
 
     private:
-        
+        void execForPeriodTime(const size_t& time, std::function<void(time_t*)> callback);
 
     private:
         ThreadPool *threadPool;
