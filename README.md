@@ -1,5 +1,6 @@
 # zspaceMQ
-用C++实现一款轻量级的消息队列
+## 引言
+这是一款用C++实现的轻量级的消息队列，原本应用在嵌入式系统上，所以这款消息队列中间件尽可能设计简单易用移植性强。至于功能性上的不足，欢迎留言评论补充，日后持续改进。
 
 ## 功能
 * 利用线程池，实现线程间消息队列广播通信
@@ -41,7 +42,7 @@ HOST=linux
 ```
 可以根据自己需求配置编译环境，配置项如下:
 ```bash
-    --prefix=<install_prefix>
+  --prefix=<install_prefix>
     配置安装路径,默认/opt/zspaceMQ
 
   --host=<host_system>
@@ -56,7 +57,7 @@ HOST=linux
   --no-tests
     不编译测试程序
 
-  clear
+  clean
     将配置文件和编译脚本清除
 ```
 示例:

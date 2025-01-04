@@ -26,11 +26,8 @@ Options:
   --no-tests
     Do not build testsuites.
 
-  --no-samples
-    Do not build samples.
-
-  clear
-    Clear config and make script.
+  clean
+    Clean config and make script.
 
 ENDHELP
 }
@@ -41,7 +38,6 @@ build=$(pwd)/build
 config_file=$(pwd)/config/config.properties
 
 tests=1
-samples=1
 noprefix=0
 prefix=""
 compiler=""
@@ -62,9 +58,6 @@ while [ $# -ge 1 ]; do
     --no-prefix)
             noprefix=1 ;;
 
-    --no-samples)
-            samples=0 ;;
-
     --no-tests)
             tests=0 ;;
 
@@ -73,7 +66,7 @@ while [ $# -ge 1 ]; do
             exit 0
             ;;
 
-    clear)
+    clean)
             sudo rm -rf config/*
             sudo rm -rf make.sh
             exit 0
@@ -106,6 +99,12 @@ if [ -z "$hostsystem" ]; then
     echo "HOST=linux" >> $config_file
 else
     echo "HOST=$hostsystem" >> $config_file
+fi
+
+if [ "$tests" -eq 1 ]; then
+    echo "TEST=$tests" >> $config_file
+else
+    echo "TEST=0" >> $config_file
 fi
 
 echo "Configuration saved to $config_file"

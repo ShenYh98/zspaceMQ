@@ -13,6 +13,7 @@ script_dir="$1"
 install_dir=""
 compiler=""
 hostsystem=""
+test=""
 config_file=$script_dir/config/config.properties
 # 从配置文件中读取安装目录
 if [ -f "$config_file" ]; then
@@ -23,6 +24,8 @@ if [ -f "$config_file" ]; then
     compiler=$CXX
     echo "Using HOST: $HOST"
     hostsystem=$HOST
+    echo "Using TEST: $TEST"
+    test=$TEST
 else
     echo "Config file not found: $config_file"
     exit 1
@@ -47,7 +50,7 @@ if [ -z "$2" ]; then
 
   if [ -z "$compiler" ]; then
     # 进行cmake构建
-    cmake -DCMAKE_INSTALL_PREFIX=$install_dir -DCOMPILE_TYPE="$2" ..
+    cmake -DCMAKE_INSTALL_PREFIX=$install_dir -DCOMPILE_TYPE="$2" -DTEST_RESULT="$test" ..
 
     # 检查cmake是否成功
     if [ $? -eq 0 ]; then
@@ -68,7 +71,7 @@ if [ -z "$2" ]; then
     fi
 
     # 进行cmake构建
-    cmake -DCMAKE_INSTALL_PREFIX=$install_dir -DCOMPILE_TYPE="$hostsystem" ..
+    cmake -DCMAKE_INSTALL_PREFIX=$install_dir -DCOMPILE_TYPE="$hostsystem" -DTEST_RESULT="$test" ..
 
     # 检查cmake是否成功
     if [ $? -eq 0 ]; then
@@ -99,6 +102,15 @@ elif [ $2 = "clean" ]; then
     echo "动态库清除成功"
   else
     echo "动态库清除失败"
+    exit 1
+  fi
+
+  sudo rm -rf ../bin/*
+  # 检查动态库清除是否成功
+  if [ $? -eq 0 ]; then
+    echo "可执行文件清除成功"
+  else
+    echo "可执行文件清除失败"
     exit 1
   fi
 
