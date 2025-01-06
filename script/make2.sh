@@ -61,7 +61,8 @@ if [ -z "$2" ]; then
       exit 1
     fi
   elif [ $compiler = "aarch64-linux-gnu-g++" ] || 
-       [ $compiler = "arm-linux-gnueabihf-g++" ]; then
+       [ $compiler = "arm-linux-gnueabihf-g++" ] || 
+       [ $compiler = "g++" ] ; then
     # 使用交叉编译工具链进行编译
     # 确保交叉编译工具链已安装并位于正确的路径下
     if [ $compiler = "aarch64-linux-gnu-g++" ]; then
