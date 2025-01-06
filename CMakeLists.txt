@@ -57,6 +57,6 @@ install(TARGETS MagicChange DESTINATION lib)
 install(FILES ${INCLUDE} DESTINATION include)
 
 if(TEST_RESULT EQUAL 1)
-	add_subdirectory(test/example1)
-	add_subdirectory(test/example2)
+	add_subdirectory(test/test1)
+	add_subdirectory(test/test2)
 endif()

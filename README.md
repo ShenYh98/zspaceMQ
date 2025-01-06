@@ -22,6 +22,8 @@
 ├── configure
 ├── LICENSE
 ├── plug                编译生成的动态库存放目录
+├── bin                 编译生成的可执行文件存放目录
+├── test                测试程序源码
 ├── README.md
 ├── script              编译脚本目录
 │   └── make2.sh
@@ -62,7 +64,7 @@ HOST=linux
 ```
 示例:
 ```bash
-./configure CXX=aarch64-linux-gnu-g++ --host=aarch64-linux-gnu --prefix=/opt/zspaceMQ/
+./configure CXX=aarch64-linux-gnu-g++ --host=aarch64-linux-gnu --prefix=/opt/zspaceMQ/ --no-tests
 ```
 
 ## 运行编译脚本编译
