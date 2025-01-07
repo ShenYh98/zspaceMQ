@@ -10,6 +10,7 @@
 #include <condition_variable>
 
 #include "ThreadPool.h"
+#include "DequeCache.hpp"
 
 /* posix通信相关 */
 #include <fcntl.h>
@@ -40,6 +41,7 @@ namespace ThreadMessageQueue {
 
     template<typename Message>
     struct Subscriber {
+        int id; // TODO 暂时不用
         std::string topic;
         std::function<void(const Message&)> callback;
         void* trace;
@@ -47,6 +49,7 @@ namespace ThreadMessageQueue {
 
     template<typename Message, typename Response>
     struct Responder {
+        int id; // TODO 暂时不用
         std::string topic;
         std::function<void(const Message&, Response&)> callback;
         void* trace;
@@ -94,7 +97,9 @@ namespace ThreadMessageQueue {
     template<typename Message>
     class MessageQueue {
     private:
-        MessageQueue() : threadPool(MQ_THREAD_MIN, MQ_THREAD_MAX) {}
+        MessageQueue() : 
+            threadPool(MQ_THREAD_MIN, MQ_THREAD_MAX)
+            {}
         MessageQueue(const MessageQueue&) = delete;
         MessageQueue& operator=(const MessageQueue&) = delete;
 
@@ -107,25 +112,33 @@ namespace ThreadMessageQueue {
         // 这个订阅里没有追踪调用对象的指针,弃用
         void subscribe(const std::string& topic, const std::function<void(const Message&)>& callback) {
             std::lock_guard<std::mutex> lock(mutex);
-            subscribers.push_back({ topic, callback });
+            subscribers.push_back({ 0, topic, callback });
         }
 
         // 加入追踪调用对象指针
         void subscribe(const std::string& topic, void* trace, const std::function<void(const Message&)>& callback) {
             std::lock_guard<std::mutex> lock(mutex);
             MessageHandle::getInstance().registerObject(trace); // 登录跟踪的类的指针
-            subscribers.push_back({ topic, callback, trace });
+            subscribers.push_back({ 0, topic, callback, trace });
         }
 
         void publish(const std::string& topic, const Message& message) {
             std::lock_guard<std::mutex> lock(mutex);
+
             for (auto subscriber = subscribers.begin(); subscriber != subscribers.end(); ) {
                 if (!MessageHandle::getInstance().isObjectAlive(subscriber->trace)) {
                     // 遍历订阅容器的同时,判断跟踪的类是否存活
                     subscribers.erase(subscriber);
                 } else {
                     if (subscriber->topic == topic) {
-                        threadPool.Add(subscriber->callback, message);
+                        CacheStrategy<Message>::getInstance().push_back(subscriber->topic, message);
+                        CacheStrategy<Message>::getInstance().printCache(subscriber->topic);
+
+                        threadPool.Add([=](const std::string& tmpTopic){
+                            auto data = CacheStrategy<Message>::getInstance().front(tmpTopic);
+                            subscriber->callback(data);
+                        }, subscriber->topic);
+
                     }
                     subscriber++;
                 }                
@@ -163,7 +176,7 @@ namespace ThreadMessageQueue {
             }
             if (!match) {
                 MessageHandle::getInstance().registerObject(trace); // 登录跟踪的类的指针
-                responders.push_back({ topic, callback, trace });
+                responders.push_back({ 0, topic, callback, trace });
             }
         }
 
