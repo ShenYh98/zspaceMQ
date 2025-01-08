@@ -74,9 +74,9 @@ int main() {
         sdata.valueInt = 1;
         sdata.valueDouble = 1.0;
         if (num <=5) {
-            MessageQueue<s_Data>::getInstance().publish("TestSub", sdata); // 广播发送，TestSubA和TestSubB都会收到消息
+            MessageQueue<s_Data>::getInstance().publish("TestSub", 10, sdata); // 广播发送，TestSubA和TestSubB都会收到消息
             sleep(3);
-            MessageQueue<int>::getInstance().publish("TestSubA1", 1); // TestSubA的TestSubA1会收到消息
+            MessageQueue<int>::getInstance().publish("TestSubA1", 10, 1); // TestSubA的TestSubA1会收到消息
             sleep(3);
 
             if (num > 0) {

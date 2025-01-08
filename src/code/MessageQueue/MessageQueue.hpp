@@ -7,6 +7,7 @@
 #include <cstdlib>
 #include <sstream>
 #include <iostream>
+#include <algorithm>
 #include <functional>
 #include <unordered_set>
 #include <condition_variable>
