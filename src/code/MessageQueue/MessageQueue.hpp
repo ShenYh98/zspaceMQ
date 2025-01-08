@@ -1,8 +1,10 @@
 #pragma once
 
 #include <mutex>
+#include <ctime>
 #include <fstream>
 #include <cstring>
+#include <cstdlib>
 #include <sstream>
 #include <iostream>
 #include <functional>
@@ -41,10 +43,10 @@ namespace ThreadMessageQueue {
 
     template<typename Message>
     struct Subscriber {
-        int id; // TODO 暂时不用
-        std::string topic;
-        std::function<void(const Message&)> callback;
-        void* trace;
+        int id;                                         // 订阅id
+        std::string topic;                              // 订阅话题
+        std::function<void(const Message&)> callback;   // 回调函数
+        void* trace;                                    // 调用对象跟踪
     };
 
     template<typename Message, typename Response>
@@ -97,9 +99,10 @@ namespace ThreadMessageQueue {
     template<typename Message>
     class MessageQueue {
     private:
-        MessageQueue() : 
-            threadPool(MQ_THREAD_MIN, MQ_THREAD_MAX)
-            {}
+        MessageQueue()
+        {
+            std::srand(static_cast<unsigned int>(std::time(nullptr)));
+        }
         MessageQueue(const MessageQueue&) = delete;
         MessageQueue& operator=(const MessageQueue&) = delete;
 
@@ -112,14 +115,20 @@ namespace ThreadMessageQueue {
         // 这个订阅里没有追踪调用对象的指针,弃用
         void subscribe(const std::string& topic, const std::function<void(const Message&)>& callback) {
             std::lock_guard<std::mutex> lock(mutex);
-            subscribers.push_back({ 0, topic, callback });
+
+            auto id = std::rand() % 10000;
+            subscribers.push_back({ id, topic, callback });
         }
 
         // 加入追踪调用对象指针
         void subscribe(const std::string& topic, void* trace, const std::function<void(const Message&)>& callback) {
             std::lock_guard<std::mutex> lock(mutex);
+
+            auto id = std::rand() % 10000;
             MessageHandle::getInstance().registerObject(trace); // 登录跟踪的类的指针
-            subscribers.push_back({ 0, topic, callback, trace });
+            subscribers.push_back({ id, topic, callback, trace });
+
+            threadPoolMap[id] = std::make_unique<ThreadPool>(MQ_THREAD_MIN, MQ_THREAD_MAX);
         }
 
         void publish(const std::string& topic, const Message& message) {
@@ -128,17 +137,37 @@ namespace ThreadMessageQueue {
             for (auto subscriber = subscribers.begin(); subscriber != subscribers.end(); ) {
                 if (!MessageHandle::getInstance().isObjectAlive(subscriber->trace)) {
                     // 遍历订阅容器的同时,判断跟踪的类是否存活
+                    // 回收订阅锁
+                    for (auto it = subscriberLocks.begin(); it != subscriberLocks.end(); it++) {
+                        if (it->first == subscriber->id) {
+                            subscriberLocks.erase(it);
+                            break;
+                        }
+                    }
+                    // 回收线程池
+                    for (auto it = threadPoolMap.begin(); it != threadPoolMap.end(); it++) {
+                        if (it->first == subscriber->id) {
+                            // 判断线程是否执行完，如果有正在处理的线程不能销毁
+                            if (0 == threadPoolMap[it->first].get()->Busynum()) {
+                                threadPoolMap.erase(it);
+                            }
+                            break;
+                        }
+                    }
+                    // 回收订阅
                     subscribers.erase(subscriber);
                 } else {
                     if (subscriber->topic == topic) {
-                        CacheStrategy<Message>::getInstance().push_back(subscriber->topic, message);
-                        CacheStrategy<Message>::getInstance().printCache(subscriber->topic);
+                        CacheStrategy<Message>::getInstance().push_back(subscriber->id, message);
+                        std::this_thread::sleep_for(std::chrono::milliseconds(5)); // 加点延时保证它的先后顺序
+                        
+                        threadPoolMap[subscriber->id]->Add([=](const int& tmpSubid) {
+                            std::mutex& subLock = subscriberLocks[tmpSubid];
+                            std::lock_guard<std::mutex> subTaskLock(subLock);
 
-                        threadPool.Add([=](const std::string& tmpTopic){
-                            auto data = CacheStrategy<Message>::getInstance().front(tmpTopic);
-                            subscriber->callback(data);
-                        }, subscriber->topic);
-
+                            auto value = CacheStrategy<Message>::getInstance().front(subscriber->id);
+                            subscriber->callback(value);
+                        }, subscriber->id);
                     }
                     subscriber++;
                 }                
@@ -147,14 +176,19 @@ namespace ThreadMessageQueue {
 
     private:
         std::vector<Subscriber<Message>> subscribers;
-        ThreadPool threadPool;
         std::mutex mutex;
+        std::unordered_map<int, std::mutex> subscriberLocks; // 每条订阅的回调函数加锁，订阅回调函数执行完才能执行下一个回调
+        std::unordered_map<int, std::unique_ptr<ThreadPool>> threadPoolMap;
     };
 
     template<typename Message, typename Response>
     class ServiceQueue {
     private:
-        ServiceQueue() : threadPool(SQ_THREAD_MIN, SQ_THREAD_MAX) {}
+        ServiceQueue() : 
+            threadPool(SQ_THREAD_MIN, SQ_THREAD_MAX) 
+            {
+                std::srand(static_cast<unsigned int>(std::time(nullptr)));
+            }
         ServiceQueue(const ServiceQueue&) = delete;
         ServiceQueue& operator=(const ServiceQueue&) = delete;
 
@@ -166,6 +200,8 @@ namespace ThreadMessageQueue {
 
         void subscribe(const std::string& topic, void* trace, const std::function<void(const Message&, Response&)>& callback) {
             std::lock_guard<std::mutex> lock(mutex);
+            
+            auto id = std::rand() % 10000;
             int match = 0;
             for (auto responder : responders) {
                 // 服务队列的订阅是点对点的,只能存在一个话题,在订阅阶段将重复的话题过滤掉
@@ -176,7 +212,7 @@ namespace ThreadMessageQueue {
             }
             if (!match) {
                 MessageHandle::getInstance().registerObject(trace); // 登录跟踪的类的指针
-                responders.push_back({ 0, topic, callback, trace });
+                responders.push_back({ id, topic, callback, trace });
             }
         }
 

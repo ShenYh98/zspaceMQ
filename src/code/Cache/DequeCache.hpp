@@ -4,7 +4,7 @@
 #include <deque>
 #include <unordered_map>
 
-#define  CACHE_MAX_SIZE    16
+#define  CACHE_MAX_SIZE    1024
 
 using namespace std;
 
@@ -13,11 +13,13 @@ namespace CommonLib {
 template <typename Data>
 class DequeCache : public std::deque<Data> {
 public:
-    DequeCache() {
-        maxSize = CACHE_MAX_SIZE;
+    DequeCache() : 
+        maxSize(CACHE_MAX_SIZE) 
+    {
     }
-    DequeCache(const int& size) {
-        maxSize = size;
+    DequeCache(const int& size) :
+        maxSize(size)
+    {
     }
     ~DequeCache() {
 
@@ -31,14 +33,6 @@ public:
         }
         // 插入新元素
         std::deque<Data>::push_back(value);
-    }
-
-    // TODO 临时调试打印一些简单类型数据
-    void printCache() const {
-        for (const auto& elem : *this) {
-            std::cout << elem << " ";
-        }
-        std::cout << std::endl;
     }
 
 private:
@@ -60,38 +54,35 @@ public:
         return instance;
     }
 
-    void push_back(const std::string& topic, const Data& value) {
+    // 每条订阅都有缓存
+    void push_back(const int& subId, Data data) {
         std::lock_guard<std::mutex> lock(mutex);
 
         // 检查 cacheMap 中是否已经存在该 topic
-        if (cacheMap.find(topic) != cacheMap.end()) {
-            cacheMap[topic].push_back(value);
+        if (cacheMap.find(subId) != cacheMap.end()) {
+            cacheMap[subId].push_back(data);
         } else {
-            cacheMap[topic] = DequeCache<Data>(CACHE_MAX_SIZE);
-            cacheMap[topic].push_back(value);
+            cacheMap[subId] = DequeCache<Data>(CACHE_MAX_SIZE);
+            cacheMap[subId].push_back(data);
         }
     }
 
     // 拿完数据就删除这个数据
-    Data front(const std::string& topic) {
+    Data front(const int& subId) {
         std::lock_guard<std::mutex> lock(mutex);
         
         Data data;
-        if (cacheMap.find(topic) != cacheMap.end()) {
-            if (!cacheMap[topic].empty()) {
-                data = cacheMap[topic].front();
-                cacheMap[topic].pop_front();
+        if (cacheMap.find(subId) != cacheMap.end()) {
+            if (!cacheMap[subId].empty()) {
+                data = cacheMap[subId].front();
+                cacheMap[subId].pop_front();
             }
         }
         return data;
     }
 
-    void printCache(const std::string& topic) {
-        cacheMap[topic].printCache();
-    }
-
 private:
-    std::unordered_map< std::string, DequeCache<Data> > cacheMap;
+    std::unordered_map< int, DequeCache<Data> > cacheMap;
     std::mutex mutex;
 };
 
