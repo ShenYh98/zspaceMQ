@@ -1,7 +1,7 @@
 #include <iostream>  
 
 #include "MessageQueue.hpp"
-#include "initThreadMessageQueue.h"
+#include "initMessageQueueT.h"
 
 using namespace std;
 using namespace CommonLib;

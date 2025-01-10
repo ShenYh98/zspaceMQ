@@ -1,7 +1,7 @@
 #include <iostream>  
 
 #include "MessageQueue.hpp"
-#include "initThreadMessageQueue.h"
+#include "initMessageQueueT.h"
 
 using namespace std;
 using namespace CommonLib;
@@ -111,17 +111,17 @@ int main() {
         sdata.valueInt = 1;
         sdata.valueDouble = 1.0;
         if (num <=5) { // 执行5次后销毁testSubA对象
-            auto res1 = ServiceQueue<s_Data, std::string>::getInstance().publish("TestSub", sdata); // TestSubA会收到消息
+            auto res1 = ServiceQueue<s_Data, std::string>::getInstance().publish("TestSub", 10, sdata); // TestSubA会收到消息
             if (res1 != "") {
                 std::cout << "recv1 res:" << res1 << std::endl;
             }
 
-            auto res2 = ServiceQueue<s_Data, std::string>::getInstance().publish("TestSubB1", sdata); // TestSubB会收到消息
+            auto res2 = ServiceQueue<s_Data, std::string>::getInstance().publish("TestSubB1", 10, sdata); // TestSubB会收到消息
             if (res2 != "") {
                 std::cout << "recv2 res:" << res2 << std::endl;
             }
 
-            auto res3 = ServiceQueue<int, std::string>::getInstance().publish("TestSub", 1); // TestSubA会收到消息
+            auto res3 = ServiceQueue<int, std::string>::getInstance().publish("TestSub", 10, 1); // TestSubA会收到消息
             if (res3 != "") {
                 std::cout << "recv3 res:" << res3 << std::endl;
             }

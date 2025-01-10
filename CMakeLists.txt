@@ -45,13 +45,13 @@ include_directories(
 )
 
 # 生成库文件
-add_library(MagicChange SHARED ${SOURCES})
+add_library(MessageQueue SHARED ${SOURCES})
 
 # 链接库文件
-target_link_libraries(MagicChange PRIVATE pthread)
+target_link_libraries(MessageQueue PRIVATE pthread)
 
 # 安装库文件到 lib 目录
-install(TARGETS MagicChange DESTINATION lib)
+install(TARGETS MessageQueue DESTINATION lib)
  
 # 安装头文件到 include 目录
 install(FILES ${INCLUDE} DESTINATION include)

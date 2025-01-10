@@ -1,4 +1,4 @@
-#include "InitMessageQueue.h"
+#include "InitMessageQueueP.h"
 
 using namespace ProcessMessageQueue;
 

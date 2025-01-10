@@ -1,4 +1,4 @@
-#include "initThreadMessageQueue.h"
+#include "initMessageQueueT.h"
 
 using namespace ThreadMessageQueue;
 
