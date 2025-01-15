@@ -35,6 +35,16 @@ public:
         std::deque<Data>::push_back(value);
     }
 
+    // 重构push_front，加入队列最大限制
+    void push_front(const Data& value) {
+        if (this->size() >= maxSize) {
+            // 如果队列已满，移除最旧的元素
+            this->pop_front();
+        }
+        // 插入新元素
+        std::deque<Data>::push_front(value);
+    }
+
 private:
     int maxSize; // 缓存的最大大小
     
@@ -67,7 +77,19 @@ public:
         }
     }
 
-    // 拿完数据就删除这个数据
+    void push_front(const int& subId, Data data) {
+        std::lock_guard<std::mutex> lock(mutex);
+
+        // 检查 cacheMap 中是否已经存在该 topic
+        if (cacheMap.find(subId) != cacheMap.end()) {
+            cacheMap[subId].push_front(data);
+        } else {
+            cacheMap[subId] = DequeCache<Data>(CACHE_MAX_SIZE);
+            cacheMap[subId].push_front(data);
+        }
+    }
+
+    // 拿完数据就删除这个数据(头部拿)
     Data front(const int& subId) {
         std::lock_guard<std::mutex> lock(mutex);
         

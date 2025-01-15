@@ -48,17 +48,15 @@ ThreadPool::~ThreadPool()
 
 int ThreadPool::Busynum()
 {
-    mutexPool.lock();
+    std::lock_guard<std::mutex> lock(mutexPool);
     int busy = busyNum;
-    mutexPool.unlock();
     return busy;
 }
 
 int ThreadPool::Alivenum()
 {
-    mutexPool.lock();
+    std::lock_guard<std::mutex> lock(mutexPool);
     int alive = liveNum;
-    mutexPool.unlock();
     return alive;
 }
 

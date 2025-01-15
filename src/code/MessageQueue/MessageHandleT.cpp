@@ -24,6 +24,27 @@ void MessageHandle::setSubInfo(const int& subId, const SubInfo& subInfo) {
     subInfoMap[subId] = subInfo;
 }
 
+void MessageHandle::setTopicNum(const int& subId, const std::string& topic) {
+    std::lock_guard<std::mutex> lock(subInfoMtx);
+
+    SubInfo subInfo;
+    subInfo.topic = topic;
+    subInfo.topicNum = 0;
+    subInfoMap[subId] = subInfo;
+    int num = 0;
+    // TODO 这边循环太影响性能了,待优化
+    for (auto it : subInfoMap) {
+        if (it.second.topic == topic) {
+            num++;
+        }
+    }
+    for (auto& it : subInfoMap) {
+        if (it.second.topic == topic) {
+            it.second.topicNum = num;
+        }
+    }
+}
+
 std::unordered_map<int, SubInfo> MessageHandle::getSubInfo() {
     return subInfoMap;
 }

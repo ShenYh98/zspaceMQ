@@ -11,10 +11,24 @@ using namespace std;
 namespace ThreadMessageQueue {
     struct SubInfo
     {
-        pid_t subTid;                               // 订阅的id
-        std::string topic;                          // 订阅的话题
-        int runState;                               // 回调执行状态 1开始 0结束
-        double runTime;      // 回调执行时长
+        pid_t subTid;       // 订阅的id
+        std::string topic;  // 订阅的话题
+        int runState;       // 回调执行状态 1开始 0结束
+        double runTime;     // 回调执行时长
+        int64_t startTime;  // 开始执行这个函数的系统时间(世纪秒)
+        int topicNum;       // 相同话题数量
+
+        // 构造函数
+        SubInfo
+            (
+            const pid_t& tid = 0, 
+            const std::string& tp = "",
+            int runst = 0,
+            double runt = 0.0,
+            int64_t startt = 0,
+            int tpn = 0
+            )
+            : subTid(tid), topic(tp), runState(runst), runTime(runt), startTime(startt), topicNum(tpn) {}
     };
 
     // 生命周期管理类
@@ -47,6 +61,8 @@ namespace ThreadMessageQueue {
         bool isObjectAlive(void* obj);
 
         void setSubInfo(const int& subId, const SubInfo& subInfo);
+
+        void setTopicNum(const int& subId, const std::string& topic);
 
         std::unordered_map<int, SubInfo> getSubInfo();
 
