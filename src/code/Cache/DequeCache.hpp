@@ -45,6 +45,10 @@ public:
         std::deque<Data>::push_front(value);
     }
 
+    int getSize() {
+        return std::deque<Data>::size();
+    }
+
 private:
     int maxSize; // 缓存的最大大小
     
@@ -87,6 +91,10 @@ public:
             cacheMap[subId] = DequeCache<Data>(CACHE_MAX_SIZE);
             cacheMap[subId].push_front(data);
         }
+    }
+
+    int getSize(const int& subId) {
+        return cacheMap[subId].getSize();
     }
 
     // 拿完数据就删除这个数据(头部拿)

@@ -12,23 +12,34 @@ namespace ThreadMessageQueue {
     struct SubInfo
     {
         pid_t subTid;       // 订阅的id
+        std::string type;   // 类型 mq/sq
         std::string topic;  // 订阅的话题
         int runState;       // 回调执行状态 1开始 0结束
         double runTime;     // 回调执行时长
         int64_t startTime;  // 开始执行这个函数的系统时间(世纪秒)
         int topicNum;       // 相同话题数量
+        int cacheSize;      // 缓存大小
 
         // 构造函数
         SubInfo
             (
             const pid_t& tid = 0, 
+            const std::string typ = "",
             const std::string& tp = "",
             int runst = 0,
             double runt = 0.0,
             int64_t startt = 0,
-            int tpn = 0
+            int tpn = 0,
+            int ccsize = 0
             )
-            : subTid(tid), topic(tp), runState(runst), runTime(runt), startTime(startt), topicNum(tpn) {}
+            : subTid(tid), 
+              type(typ),
+              topic(tp), 
+              runState(runst), 
+              runTime(runt), 
+              startTime(startt), 
+              topicNum(tpn),
+              cacheSize(ccsize) {}
     };
 
     // 生命周期管理类
@@ -66,7 +77,7 @@ namespace ThreadMessageQueue {
 
         std::unordered_map<int, SubInfo> getSubInfo();
 
-        void eraseSubInfo(const int& subId);    
+        void eraseSubInfo(const int& subId);
 
     private:
         mutable std::mutex mutex;

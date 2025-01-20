@@ -32,7 +32,7 @@ void MessageHandle::setTopicNum(const int& subId, const std::string& topic) {
     subInfo.topicNum = 0;
     subInfoMap[subId] = subInfo;
     int num = 0;
-    // TODO 这边循环太影响性能了,待优化
+    // TODO 下面两个循环太影响性能了,待优化
     for (auto it : subInfoMap) {
         if (it.second.topic == topic) {
             num++;

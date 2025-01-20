@@ -107,6 +107,16 @@ namespace ThreadMessageQueue {
             std::lock_guard<std::mutex> lock(mutex);
 
             auto id = std::rand() % 10000;
+            auto checkMap = MessageHandle::getInstance().getSubInfo();
+            while (true)
+            {
+                if (checkMap.find(id) != checkMap.end()) {
+                    id = std::rand() % 10000;
+                } else {
+                    break;
+                }
+            }
+            
             subscribers.push_back({ id, topic, callback });
             threadPoolMap[id] = std::make_unique<ThreadPool>(MQ_THREAD_MIN, MQ_THREAD_MAX);
             delayLockMap[id].is_lockHeld = false;
@@ -118,6 +128,16 @@ namespace ThreadMessageQueue {
             std::lock_guard<std::mutex> lock(mutex);
 
             auto id = std::rand() % 10000;
+            auto checkMap = MessageHandle::getInstance().getSubInfo();
+            while (true)
+            {
+                if (checkMap.find(id) != checkMap.end()) {
+                    id = std::rand() % 10000;
+                } else {
+                    break;
+                }
+            }
+            
             MessageHandle::getInstance().registerObject(trace); // 登录跟踪的类的指针
             subscribers.push_back({ id, topic, callback, trace });
             threadPoolMap[id] = std::make_unique<ThreadPool>(MQ_THREAD_MIN, MQ_THREAD_MAX);
@@ -185,10 +205,12 @@ namespace ThreadMessageQueue {
 
         void setSubInfoContainer (const int& id, const std::string& topic, const int& runState) {
             SubInfo subInfo;
+            subInfo.type = "mq";
             subInfo.topic = topic;
             subInfo.subTid = gettid();
             subInfo.runState = runState;
             subInfo.startTime = getCurrentEpochSeconds();
+            subInfo.cacheSize = CacheStrategy<Message>::getInstance().getSize(id);
 
             auto subInfoMap = MessageHandle::getInstance().getSubInfo();
             if (subInfoMap.find(id) == subInfoMap.end()) {
@@ -206,11 +228,13 @@ namespace ThreadMessageQueue {
 
         void setSubInfoContainer (const int& id, const std::string& topic, const int& runState, const double& runTime) {
             SubInfo subInfo;
+            subInfo.type = "mq";
             subInfo.topic = topic;
             subInfo.subTid = gettid();
             subInfo.runState = runState;
             subInfo.runTime = runTime;
             subInfo.startTime = getCurrentEpochSeconds();
+            subInfo.cacheSize = CacheStrategy<Message>::getInstance().getSize(id);
 
             auto subInfoMap = MessageHandle::getInstance().getSubInfo();
             if (subInfoMap.find(id) != subInfoMap.end()) {
@@ -384,6 +408,16 @@ namespace ThreadMessageQueue {
             std::lock_guard<std::mutex> lock(mutex);
             
             auto id = std::rand() % 10000;
+            auto checkMap = MessageHandle::getInstance().getSubInfo();
+            while (true)
+            {
+                if (checkMap.find(id) != checkMap.end()) {
+                    id = std::rand() % 10000;
+                } else {
+                    break;
+                }
+            }
+
             int match = 0;
             for (auto responder : responders) {
                 // 服务队列的订阅是点对点的,只能存在一个话题,在订阅阶段将重复的话题过滤掉
@@ -469,11 +503,22 @@ namespace ThreadMessageQueue {
         }
 
     private:
+        int64_t getCurrentEpochSeconds() {
+            // 获取世纪秒
+            auto now = std::chrono::system_clock::now();
+            auto duration = now.time_since_epoch();
+            auto seconds = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
+        
+            return seconds;
+        }
+
         void setSubInfoContainer (const std::string& topic, const int& runState) {
             SubInfo subInfo;
+            subInfo.type = "sq";
             subInfo.topic = topic;
             subInfo.subTid = gettid();
             subInfo.runState = runState;
+            subInfo.startTime = getCurrentEpochSeconds();
 
             for (auto responder : responders) {
                 if (responder.topic == topic) {
@@ -493,10 +538,13 @@ namespace ThreadMessageQueue {
         
         void setSubInfoContainer (const std::string& topic, const int& runState, const double& runTime) {
             SubInfo subInfo;
+            subInfo.type = "sq";
             subInfo.topic = topic;
             subInfo.subTid = gettid();
             subInfo.runState = runState;
             subInfo.runTime = runTime;
+            subInfo.startTime = getCurrentEpochSeconds();
+
             for (auto responder : responders) {
                 if (responder.topic == topic) {
                     MessageHandle::getInstance().setSubInfo(responder.id, subInfo);
