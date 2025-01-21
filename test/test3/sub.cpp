@@ -15,14 +15,22 @@ public:
     TestSubA() {
         std::cout << "[TestSubA] init test sub" << std::endl;
 
-        MessageQueue<Data>::getInstance().subscribe("TestSub", 
-            [&](const Data &msg){
-                std::cout << "[TestSubA] 1" << msg.id() << "/" << msg.flag() << "/" << msg.num() << std::endl;
+        MessageQueue<bool>::getInstance().subscribe("TestSub", 
+            [&](const bool &msg){
+                if (msg == true) {
+                    std::cout << "[TestSubA] 1" << true << std::endl;
+                } else {
+                    std::cout << "[TestSubA] 1" << false << std::endl;
+                }
             });
 
-        MessageQueue<Data>::getInstance().subscribe("TestSub", 
-            [&](const Data &msg){
-                std::cout << "[TestSubA] 2" << msg.id() << "/" << msg.flag() << "/" << msg.num() << std::endl;
+        MessageQueue<bool>::getInstance().subscribe("TestSub", 
+            [&](const bool &msg){
+                if (msg == true) {
+                    std::cout << "[TestSubA] 2" << true << std::endl;
+                } else {
+                    std::cout << "[TestSubA] 2" << false << std::endl;
+                }
             });
     }
 

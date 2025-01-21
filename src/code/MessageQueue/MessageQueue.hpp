@@ -9,6 +9,7 @@
 #include <iostream>
 #include <algorithm>
 #include <functional>
+#include <type_traits>
 #include <unordered_set>
 #include <condition_variable>
 
@@ -589,7 +590,7 @@ namespace ProcessMessageQueue {
         }
 
         // 发送在初始化处完成
-        void publish(const std::string& topic, Message& data) {
+        void publish(const std::string& topic, const Message& data) {
             MessageHandle::getInstance().getVTopic(this->v_recv_topic);
 
             for (auto it : v_recv_topic) {
@@ -600,24 +601,60 @@ namespace ProcessMessageQueue {
         } 
 
     private:
-        void client(const std::string& topic, Message& data) {
+        std::string selectionOfDataTypes(const Message& data) {
+            // 判断发送数据的类型
+            std::string serialized_data;
+            if constexpr (std::is_same_v<std::decay_t<Message>, std::string>) { // 判断是否为string类型
+                serialized_data = data;
+            } else if constexpr (std::is_arithmetic_v<Message>) { // 判断是否为基本数据类型
+                std::ostringstream oss;
+                oss << data;
+                serialized_data = oss.str();
+            } else if constexpr (std::is_same_v<std::decay_t<Message>, bool>) { // 判断是否为bool类型
+                std::ostringstream oss;
+                oss << data;
+                serialized_data = oss.str();
+            } else {
+                // 将发送的数据序列化
+                data.SerializeToString(&serialized_data);
+            }
+            return serialized_data;
+        }
+
+        bool selectionOfDataTypes(char* buf, Message& res) {
+            // 判断发送数据的类型
+            if constexpr (std::is_same_v<std::decay_t<Message>, std::string>) { // 判断是否为string类型
+                std::string tmpstr(buf);
+                res = tmpstr;
+            } else if constexpr (std::is_arithmetic_v<Message>) { // 判断是否为基本数据类型
+
+            } else if constexpr (std::is_same_v<std::decay_t<Message>, bool>) { // 判断是否为bool类型
+                if (std::strcmp(buf, "true")) {
+                    res = true;
+                } else {
+                    res = false;
+                }
+            } else {
+                if (!res.ParseFromString(buf)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        void client(const std::string& topic, const Message& data) {
             // client
             try 
             {
-                std::string queue_name = topic;
-            
                 mqd_t mq;
-                mq = mq_open(queue_name.c_str(), O_WRONLY | O_NONBLOCK);
+                mq = mq_open(topic.c_str(), O_WRONLY | O_NONBLOCK);
                 if (mq == -1) {
                     std::cerr << "2 Failed to open/create message queue" << std::endl;
                     return ;
                 }
 
-                // 将发送的数据序列化
-                std::string serialized_data;
-                data.SerializeToString(&serialized_data);
                 // 发送消息
-                const char *message = serialized_data.c_str();
+                const char *message = selectionOfDataTypes(data).c_str();
                 if (mq_send(mq, message, strlen(message) + 1, 0) == -1) {
                     std::cerr << "Failed to send message" << std::endl;
                     mq_close(mq);
@@ -644,15 +681,14 @@ namespace ProcessMessageQueue {
                 ss << this_id;
                 std::string thread_id_str = ss.str();
 
-                std::string tmp_queue_name = "/t" + thread_id_str + "_" + topic;
+                std::string queue_name = "/t" + thread_id_str + "_" + topic;
                 {
                     std::lock_guard<std::mutex> lock(mutex);
-                    pipeWrite(init_sub_path, tmp_queue_name); 
+                    pipeWrite(init_sub_path, queue_name); 
                 }
 
+                /*
                 while (true) {
-                    std::string queue_name = tmp_queue_name;
-
                     mqd_t mq;
                     struct mq_attr attr;
                     attr.mq_flags = 0;
@@ -685,11 +721,53 @@ namespace ProcessMessageQueue {
                         
                     } else {
                         std::cerr << "Failed to receive message or queue is empty" << std::endl;
+                        mq_close(mq);
+                        return;
                     }
                 
                     // 关闭消息队列
                     mq_close(mq);
                 }
+                */
+
+                mqd_t mq;
+                struct mq_attr attr;
+                attr.mq_flags = 0;
+                attr.mq_maxmsg = 10;
+                attr.mq_msgsize = 256;
+                attr.mq_curmsgs = 0;
+            
+                // 打开/创建消息队列
+                mq = mq_open(queue_name.c_str(), O_CREAT | O_RDWR, 0666, &attr);
+                if (mq == -1) {
+                    std::cerr << "1 Failed to open/create message queue, topic:" << queue_name
+                            << ", error: " << strerror(errno) << std::endl;
+                    return ;
+                }
+
+                while (true) {
+                    // 接收消息
+                    char buffer[256];
+                    ssize_t bytes_read = mq_receive(mq, buffer, 256, NULL);
+                    if (bytes_read >= 0) {
+                        buffer[bytes_read] = '\0';
+
+                        Message data;
+                        if (!selectionOfDataTypes(buffer, data)) {
+                            std::cerr << "Failed to parse received message" << std::endl;
+                            mq_close(mq);
+                            return;
+                        }
+                        callback(data);
+                        
+                    } else {
+                        std::cerr << "Failed to receive message or queue is empty" << std::endl;
+                        mq_close(mq);
+                        return;
+                    }
+                }
+
+                mq_close(mq);
             } 
             catch (const std::exception& exc) 
             {
@@ -762,13 +840,13 @@ namespace ProcessMessageQueue {
         }
 
         // 发送在初始化处完成
-        Response publish(const std::string& topic, Message& data) {
+        Response publish(const std::string& topic, const Message& data) {
             auto res = client(topic, data);
             return res;
         } 
 
     private:
-        Response client(const std::string& topic, Message& request_data) {
+        Response client(const std::string& topic, const Message& data) {
             try 
             {
                 std::string request_queue_name = "/request_" + topic;
@@ -782,6 +860,8 @@ namespace ProcessMessageQueue {
                     return response_data;;
                 }
         
+                Message request_data = data;
+
                 // 序列化请求数据并发送
                 std::string serialized_request;
                 request_data.SerializeToString(&serialized_request);

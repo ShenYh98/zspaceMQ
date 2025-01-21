@@ -15,15 +15,15 @@ public:
     TestSubB() {
         std::cout << "[TestSubB] init test sub" << std::endl;
 
-        MessageQueue<Data>::getInstance().subscribe("TestSub", 
-            [&](const Data &msg){
-                std::cout << "[TestSubB] 1" << std::endl;
-            });
+        // MessageQueue<Data>::getInstance().subscribe("TestSub", 
+        //     [&](const Data &msg){
+        //         std::cout << "[TestSubB] 1" << std::endl;
+        //     });
 
-        MessageQueue<Data>::getInstance().subscribe("TestSub", 
-            [&](const Data &msg){
-                std::cout << "[TestSubB] 2" << std::endl;
-            });
+        // MessageQueue<Data>::getInstance().subscribe("TestSub", 
+        //     [&](const Data &msg){
+        //         std::cout << "[TestSubB] 2" << std::endl;
+        //     });
     }
 
     ~TestSubB() {
@@ -42,11 +42,14 @@ int main() {
 
     while (true)
     {
-        Data data;
-        data.set_id(1);
-        data.set_flag(2);
-        data.set_num(3);
-        MessageQueue<Data>::getInstance().publish("TestSub", data); // TestSubA会收到消息
+        // Data data;
+        // data.set_id(1);
+        // data.set_flag(2);
+        // data.set_num(3);
+
+        MessageQueue<bool>::getInstance().publish("TestSub", true); // TestSubA会收到消息
+        sleep(3);
+        MessageQueue<bool>::getInstance().publish("TestSub", false); // TestSubA会收到消息
         sleep(3);
     }
 
