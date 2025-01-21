@@ -3,6 +3,11 @@
 using namespace ProcessMessageQueue;
 
 void InitMessageQueue::initSubscribeInfo() {
+    if (!isDirAndFileExist()) {
+        std::cerr << "init sub failed!" << std::endl;
+        return ;
+    }
+
     fork_lk = open(FORK_LOCK_FILE, O_CREAT | O_RDWR, 0666);
     if (fork_lk == -1) {
         perror("open");
@@ -229,4 +234,41 @@ void InitMessageQueue::execForPeriodTime(const size_t& time, std::function<void(
         // 执行回调函数
         callback(&startTime);
     }
+}
+
+bool InitMessageQueue::createDirectory(const string& path) {
+    if (mkdir(path.c_str(), 0755) == -1) {
+        if (errno != EEXIST) { // 如果错误不是目录已存在
+            perror("mkdir");
+            return false;
+        }
+    }
+    return true;
+}
+
+bool InitMessageQueue::createFile(const string& path) {
+    int fd = open(path.c_str(), O_WRONLY | O_CREAT | O_TRUNC, 0644);
+    if (fd == -1) {
+        perror("open");
+        return false;
+    }
+    close(fd);
+    return true;
+}
+
+bool InitMessageQueue::isDirAndFileExist() {
+    std::string tmpDirPath = ROOT_PATH;
+    std::string lockFilePath = FORK_LOCK_FILE;
+
+    // 检查并创建tmp目录
+    if (!createDirectory(tmpDirPath)) {
+        return false;
+    }
+
+    // 检查并创建example.lock文件
+    if (!createFile(lockFilePath)) {
+        return false;
+    }
+
+    return true;
 }

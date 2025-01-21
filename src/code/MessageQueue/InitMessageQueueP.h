@@ -1,10 +1,18 @@
 #pragma once
 
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <errno.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+
 #include "ThreadPool.h"
 #include "MessageQueue.hpp"
 
 #define  MAX_TIME                   5
 
+#define  ROOT_PATH                  "./tmp"
 #define  INIT_SUB_PATH              "./tmp/init_sub_fifo"
 #define  RECV_WAIT_PATH             "./tmp/recv_wait_fifo"
 #define  FORK_LOCK_FILE             "example.lock"
@@ -66,6 +74,12 @@ namespace ProcessMessageQueue {
         std::vector<std::string> parseString(const char* str);
 
         void execForPeriodTime(const size_t& time, std::function<void(time_t*)> callback);
+
+        bool createDirectory(const string& path);
+        
+        bool createFile(const string& path);
+
+        bool isDirAndFileExist();
 
     private:
         ThreadPool *threadPool;

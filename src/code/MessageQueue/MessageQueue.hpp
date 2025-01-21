@@ -30,11 +30,11 @@
 #define  SQ_THREAD_MAX     16
 #define  SQ_THREAD_MIN     1
 
-#define  MQ2_THREAD_MAX    16
-#define  MQ2_THREAD_MIN    1
+#define  MQ_PROCESS_MAX    128
+#define  MQ_PROCESS_MIN    64
 
-#define  SQ2_THREAD_MAX    16
-#define  SQ2_THREAD_MIN    1
+#define  SQ_PROCESS_MAX    16
+#define  SQ_PROCESS_MIN    1
 
 #define  INIT_SUB_PATH     "./tmp/init_sub_fifo"
 
@@ -569,7 +569,7 @@ namespace ProcessMessageQueue {
     class MessageQueue {
     private:
         MessageQueue() : 
-            threadPool(MQ2_THREAD_MIN, MQ2_THREAD_MAX) , 
+            threadPool(MQ_PROCESS_MIN, MQ_PROCESS_MAX) , 
             init_sub_path(INIT_SUB_PATH)
             {
             }
@@ -744,7 +744,7 @@ namespace ProcessMessageQueue {
     class ServiceQueue {
     private:
         ServiceQueue() : 
-            threadPool(SQ2_THREAD_MIN, SQ2_THREAD_MAX)
+            threadPool(SQ_PROCESS_MIN, SQ_PROCESS_MAX)
         {}
         ServiceQueue(const ServiceQueue&) = delete;
         ServiceQueue& operator=(const ServiceQueue&) = delete;
@@ -812,8 +812,6 @@ namespace ProcessMessageQueue {
 
                     if (!response_data.ParseFromString(buffer)) {
                         std::cerr << "Failed to parse received response" << std::endl;
-                    } else {
-                        // std::cout << "Received response successfully" << std::endl;
                     }
                 } else {
                     std::cerr << "Failed to receive response" << std::endl;

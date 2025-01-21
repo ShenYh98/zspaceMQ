@@ -80,6 +80,11 @@ HOST=linux
 ```bash
 ./make.sh clean
 ```
+
+## 接口使用
+csdn有关于接口的详细使用教程，链接如下：
+[zspaceMQ一款linux平台下轻量的C++消息队列组件](https://blog.csdn.net/qq_44027819/article/details/145253901?spm=1001.2014.3001.5502)
+
 ## 致谢
-Linux下C++消息队列zspaceMQ，沈义函
+Linux下C++消息队列zspaceMQ
 问题反馈邮箱：907184203@qq.com
