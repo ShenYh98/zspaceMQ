@@ -25,8 +25,8 @@
 #include <sys/wait.h>
 #include <sys/file.h>
 
-#define  MQ_THREAD_MAX     4
-#define  MQ_THREAD_MIN     1
+#define  MQ_THREAD_MAX     16
+#define  MQ_THREAD_MIN     8
 
 #define  SQ_THREAD_MAX     16
 #define  SQ_THREAD_MIN     1
@@ -150,7 +150,7 @@ namespace ThreadMessageQueue {
         void publish(const std::string& topic, const Message& message) {
             std::lock_guard<std::mutex> lock(mutex);
 
-            PublishHandle<Message> pubHandle = {topic, message};
+            PublishHandle<Message> pubHandle = {topic, message, true};
             publishHandleProc(pubHandle);
         }
 
@@ -297,17 +297,29 @@ namespace ThreadMessageQueue {
 
         void threadPoolMapHandle (const int& subid, const std::string& topic, const int& timeout, const std::function<void(const Message&)>& toCall) {
             threadPoolMap[subid]->Add([=](const int& tmpSubid, const std::string& tmpTopic, const int& tmpTimeout) {
-                auto start_time = std::chrono::steady_clock::now();
+                // auto start_time = std::chrono::steady_clock::now();
+                std::chrono::_V2::steady_clock::time_point start_time;
                 {
                     std::mutex& submtx = delayLockMap[tmpSubid].mtx;
                     std::unique_lock<std::mutex> lock(submtx);
+
+                    start_time = std::chrono::steady_clock::now();
 
                     while (delayLockMap[tmpSubid].is_lockHeld && (std::chrono::steady_clock::now() - start_time < std::chrono::seconds(tmpTimeout))) {
                         delayLockMap[tmpSubid].cv.wait_for(lock, std::chrono::milliseconds(100)); // 定期检查
                     }
 
                     if (delayLockMap[tmpSubid].is_lockHeld) {
-                        std::cerr << "sub id:" << tmpSubid << " timed out waiting for the lock." << std::endl;
+                        std::cerr << "sub id:" << tmpSubid << " lockHeld." << std::endl;
+                    }
+                    if (!(std::chrono::steady_clock::now() - start_time < std::chrono::seconds(tmpTimeout))) {
+                        auto duration = std::chrono::steady_clock::now() - start_time;
+                        auto seconds = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
+                        std::cerr << "sub id:" << tmpSubid << " time:" << seconds << " timed out." << std::endl;
+                    }
+
+                    if (delayLockMap[tmpSubid].is_lockHeld && !(std::chrono::steady_clock::now() - start_time < std::chrono::seconds(tmpTimeout))) {
+                        std::cerr << "sub id:" << tmpSubid << " tid:" << gettid() << " timed out waiting for the lock." << std::endl;
                         if (std::find(subTrashs.begin(), subTrashs.end(), subid) == subTrashs.end()) {
                             subTrashs.push_back(tmpSubid);
                         }
@@ -351,7 +363,7 @@ namespace ThreadMessageQueue {
                     // 遍历订阅容器的同时, 判断跟踪的类是否存活
 
                     if (0 == threadPoolMap[subscriber->id].get()->Busynum()) { // 确保没有正在执行的线程了再去回收
-                        std::cerr << "subscriber trace miss." << std::endl;
+                        std::cerr << "id:" << subscriber->id << " topic:" << subscriber->topic << " subscriber trace miss." << std::endl;
                         // 回收各类容器
                         recycleTrashs(subscriber->id);
 
@@ -368,7 +380,7 @@ namespace ThreadMessageQueue {
                             CacheStrategy<Message>::getInstance().push_front(subscriber->id, publishHandle.message);
                         }
                         std::this_thread::sleep_for(std::chrono::milliseconds(5)); // 加点延时保证它的先后顺序
-                        
+
                         if (publishHandle.timeout != -1 && publishHandle.is_block != false) {
                             threadPoolMapHandle(subscriber->id, subscriber->topic, publishHandle.timeout, subscriber->callback);
                         } else {
