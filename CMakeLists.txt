@@ -3,9 +3,6 @@ cmake_minimum_required(VERSION 3.1)  # 指定最低版本要求
 # 设置项目名称
 project(MyProject) 
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)  # 确保使用C++17标准
-
 # 检查是否已经指定了编译器
 if(NOT DEFINED CMAKE_C_COMPILER)
   set(CMAKE_C_COMPILER gcc)
