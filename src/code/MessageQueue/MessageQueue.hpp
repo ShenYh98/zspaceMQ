@@ -281,17 +281,27 @@ namespace ThreadMessageQueue {
                 if (tmpBlock) {
                     std::mutex& subLock = subscriberLockMap[tmpSubid];
                     std::lock_guard<std::mutex> subTaskLock(subLock);
+
+                    setSubInfoContainer(subid, tmpTopic, 1);
+                    auto start = std::chrono::high_resolution_clock::now();
+
+                    auto value = CacheStrategy<Message>::getInstance().front(tmpSubid);
+                    toCall(value);
+
+                    auto end = std::chrono::high_resolution_clock::now();
+                    std::chrono::duration<double> duration = end - start;
+                    setSubInfoContainer(subid, tmpTopic, 0, duration.count());
+                } else {
+                    setSubInfoContainer(subid, tmpTopic, 1);
+                    auto start = std::chrono::high_resolution_clock::now();
+
+                    auto value = CacheStrategy<Message>::getInstance().front(tmpSubid);
+                    toCall(value);
+
+                    auto end = std::chrono::high_resolution_clock::now();
+                    std::chrono::duration<double> duration = end - start;
+                    setSubInfoContainer(subid, tmpTopic, 0, duration.count());
                 }
-
-                setSubInfoContainer(subid, tmpTopic, 1);
-                auto start = std::chrono::high_resolution_clock::now();
-
-                auto value = CacheStrategy<Message>::getInstance().front(tmpSubid);
-                toCall(value);
-
-                auto end = std::chrono::high_resolution_clock::now();
-                std::chrono::duration<double> duration = end - start;
-                setSubInfoContainer(subid, tmpTopic, 0, duration.count());
             }, subid, topic, is_block);
         }
 
