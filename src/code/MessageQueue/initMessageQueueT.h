@@ -8,10 +8,7 @@ using namespace ThreadMessageQueue;
 namespace ThreadMessageQueue {
     class InitMessageQueue {
     private:
-        InitMessageQueue()
-            {
-                threadPool = new ThreadPool(1, 2); // 会有一个监控线程,会一直挂在后端监控订阅信息
-            }
+        InitMessageQueue() {}
         InitMessageQueue(const InitMessageQueue&) = delete;
         InitMessageQueue& operator=(const InitMessageQueue&) = delete;
 
@@ -26,11 +23,12 @@ namespace ThreadMessageQueue {
 
         void destroySubscribe (void* obj);
 
+        void initThreadPool(const int& min, const int& max);
+
     private:
         void execForPeriodTime(const size_t& time, std::function<void(time_t*)> callback);
 
     private:
-        ThreadPool *threadPool;
         mutable std::mutex mutex;
     };
 };

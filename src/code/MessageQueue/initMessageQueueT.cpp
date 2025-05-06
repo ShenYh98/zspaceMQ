@@ -10,6 +10,14 @@ void InitMessageQueue::initSubscribeInfo() {
     */
 }
 
+void InitMessageQueue::initThreadPool(const int& min, const int& max) {
+    std::lock_guard<std::mutex> lock(mutex);
+
+    if (min - 1 >= 0 && max - 1 >= 0 && max -1 > min - 1) {
+        MessageHandle::getInstance().threadPool = make_unique<ThreadPool>(min-1, max-1);
+    }
+}
+
 void InitMessageQueue::destroySubscribe (void* obj) {
     std::lock_guard<std::mutex> lock(mutex);
 

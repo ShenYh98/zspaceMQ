@@ -25,20 +25,6 @@
 #include <sys/wait.h>
 #include <sys/file.h>
 
-#define  MQ_THREAD_MAX     16
-#define  MQ_THREAD_MIN     8
-
-#define  SQ_THREAD_MAX     16
-#define  SQ_THREAD_MIN     1
-
-#define  MQ_PROCESS_MAX    128
-#define  MQ_PROCESS_MIN    64
-
-#define  SQ_PROCESS_MAX    16
-#define  SQ_PROCESS_MIN    1
-
-#define  INIT_SUB_PATH     "./tmp/init_sub_fifo"
-
 using namespace CommonLib;
 
 /* 第一版线程间通信的消息队列(单线程通信,无法进程间通信) */
@@ -103,27 +89,6 @@ namespace ThreadMessageQueue {
             return instance;
         }
 
-        // 这个订阅里没有追踪调用对象的指针,弃用
-        void subscribe(const std::string& topic, const std::function<void(const Message&)>& callback) {
-            std::lock_guard<std::mutex> lock(mutex);
-
-            auto id = std::rand() % 10000;
-            auto checkMap = MessageHandle::getInstance().getSubInfo();
-            while (true)
-            {
-                if (checkMap.find(id) != checkMap.end()) {
-                    id = std::rand() % 10000;
-                } else {
-                    break;
-                }
-            }
-            
-            subscribers.push_back({ id, topic, callback });
-            threadPoolMap[id] = std::make_unique<ThreadPool>(MQ_THREAD_MIN, MQ_THREAD_MAX);
-            delayLockMap[id].is_lockHeld = false;
-            MessageHandle::getInstance().setTopicNum(id, topic);
-        }
-
         // 加入追踪调用对象指针
         void subscribe(const std::string& topic, void* trace, const std::function<void(const Message&)>& callback) {
             std::lock_guard<std::mutex> lock(mutex);
@@ -141,7 +106,7 @@ namespace ThreadMessageQueue {
             
             MessageHandle::getInstance().registerObject(trace); // 登录跟踪的类的指针
             subscribers.push_back({ id, topic, callback, trace });
-            threadPoolMap[id] = std::make_unique<ThreadPool>(MQ_THREAD_MIN, MQ_THREAD_MAX);
+            // threadPoolMap[id] = std::make_unique<ThreadPool>(MQ_THREAD_MIN, MQ_THREAD_MAX);
             delayLockMap[id].is_lockHeld = false;
             MessageHandle::getInstance().setTopicNum(id, topic);
         }
@@ -255,6 +220,7 @@ namespace ThreadMessageQueue {
                 }
             }
             // 回收线程池
+            /*
             for (auto it = threadPoolMap.begin(); it != threadPoolMap.end(); it++) {
                 if (it->first == subId) {
                     // 判断线程是否执行完，如果有正在处理的线程不能销毁
@@ -264,6 +230,7 @@ namespace ThreadMessageQueue {
                     break;
                 }
             }
+            */
             // 回收标志位
             for (auto it = delayLockMap.begin(); it != delayLockMap.end(); it++) {
                 if (it->first == subId) {
@@ -277,27 +244,38 @@ namespace ThreadMessageQueue {
         }
 
         void threadPoolMapHandle (const int& subid, const std::string& topic, const bool& is_block, const std::function<void(const Message&)>& toCall) {
-            threadPoolMap[subid]->Add([=](const int& tmpSubid, const std::string& tmpTopic, const bool& tmpBlock) {
+            // threadPoolMap[subid]->Add([=](const int& tmpSubid, const std::string& tmpTopic, const bool& tmpBlock) {
+            MessageHandle::getInstance().threadPool->Add([=](const int& tmpSubid, const std::string& tmpTopic, const bool& tmpBlock) {
                 if (tmpBlock) {
                     std::mutex& subLock = subscriberLockMap[tmpSubid];
                     std::lock_guard<std::mutex> subTaskLock(subLock);
+                    
+                    setSubInfoContainer(subid, tmpTopic, 1);
+                    auto start = std::chrono::high_resolution_clock::now();
+
+                    auto value = CacheStrategy<Message>::getInstance().front(tmpSubid);
+                    toCall(value);
+
+                    auto end = std::chrono::high_resolution_clock::now();
+                    std::chrono::duration<double> duration = end - start;
+                    setSubInfoContainer(subid, tmpTopic, 0, duration.count());
+                } else {
+                    setSubInfoContainer(subid, tmpTopic, 1);
+                    auto start = std::chrono::high_resolution_clock::now();
+
+                    auto value = CacheStrategy<Message>::getInstance().front(tmpSubid);
+                    toCall(value);
+
+                    auto end = std::chrono::high_resolution_clock::now();
+                    std::chrono::duration<double> duration = end - start;
+                    setSubInfoContainer(subid, tmpTopic, 0, duration.count());
                 }
-
-                setSubInfoContainer(subid, tmpTopic, 1);
-                auto start = std::chrono::high_resolution_clock::now();
-
-                auto value = CacheStrategy<Message>::getInstance().front(tmpSubid);
-                toCall(value);
-
-                auto end = std::chrono::high_resolution_clock::now();
-                std::chrono::duration<double> duration = end - start;
-                setSubInfoContainer(subid, tmpTopic, 0, duration.count());
             }, subid, topic, is_block);
         }
 
         void threadPoolMapHandle (const int& subid, const std::string& topic, const int& timeout, const std::function<void(const Message&)>& toCall) {
-            threadPoolMap[subid]->Add([=](const int& tmpSubid, const std::string& tmpTopic, const int& tmpTimeout) {
-                // auto start_time = std::chrono::steady_clock::now();
+            // threadPoolMap[subid]->Add([=](const int& tmpSubid, const std::string& tmpTopic, const int& tmpTimeout) {
+            MessageHandle::getInstance().threadPool->Add([=](const int& tmpSubid, const std::string& tmpTopic, const int& tmpTimeout) {
                 std::chrono::_V2::steady_clock::time_point start_time;
                 {
                     std::mutex& submtx = delayLockMap[tmpSubid].mtx;
@@ -361,7 +339,8 @@ namespace ThreadMessageQueue {
             for (auto subscriber = subscribers.begin(); subscriber != subscribers.end(); subscriber++) {
                 if (!MessageHandle::getInstance().isObjectAlive(subscriber->trace)) {
                     // 遍历订阅容器的同时, 判断跟踪的类是否存活
-
+                    
+                    /*
                     if (0 == threadPoolMap[subscriber->id].get()->Busynum()) { // 确保没有正在执行的线程了再去回收
                         std::cerr << "id:" << subscriber->id << " topic:" << subscriber->topic << " subscriber trace miss." << std::endl;
                         // 回收各类容器
@@ -370,6 +349,7 @@ namespace ThreadMessageQueue {
                         // 回收订阅
                         subscriber = subscribers.erase(subscriber);
                     }
+                    */
                 } else if (std::find(subTrashs.begin(), subTrashs.end(), subscriber->id) != subTrashs.end()) {
                     // 判断这个订阅是否在订阅垃圾列表中
                 } else {
@@ -397,14 +377,13 @@ namespace ThreadMessageQueue {
         std::vector<int> subTrashs;
         std::unordered_map<int, DelayLock> delayLockMap; // 超时发布才会用到, 用来解锁的
         std::unordered_map<int, std::mutex> subscriberLockMap; // 每条订阅的回调函数加锁, 订阅回调函数执行完才能执行下一个回调
-        std::unordered_map<int, std::unique_ptr<ThreadPool>> threadPoolMap;
+        // std::unordered_map<int, std::unique_ptr<ThreadPool>> threadPoolMap;
     };
 
     template<typename Message, typename Response>
     class ServiceQueue {
     private:
-        ServiceQueue() : 
-            threadPool(SQ_THREAD_MIN, SQ_THREAD_MAX) 
+        ServiceQueue()
             {
                 std::srand(static_cast<unsigned int>(std::time(nullptr)));
             }
@@ -483,7 +462,7 @@ namespace ThreadMessageQueue {
                 std::condition_variable cv;
                 bool done = false;
 
-                threadPool.Add([&](){
+                MessageHandle::getInstance().threadPool->Add([&](){
                     setSubInfoContainer(topic, 1);
                     auto start = std::chrono::high_resolution_clock::now();
 
@@ -569,7 +548,6 @@ namespace ThreadMessageQueue {
     private:
         std::vector<Responder<Message, Response>> responders;
         std::vector<std::string> v_trashTopic; // 超时的订阅, 将话题保存到垃圾话题队列
-        ThreadPool threadPool;
         std::mutex mutex;
     };
 

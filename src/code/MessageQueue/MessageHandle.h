@@ -6,7 +6,13 @@
 #include <unordered_set>
 #include <unordered_map>
 
+#include "ThreadPool.h"
+
+#define  THREAD_MAX     16
+#define  THREAD_MIN     8
+
 using namespace std;
+using namespace CommonLib;
 
 namespace ThreadMessageQueue {
     struct SubInfo
@@ -53,8 +59,9 @@ namespace ThreadMessageQueue {
 
     private:
         // 私有构造函数，防止外部直接创建实例
-        MessageHandle()
-        {}
+        MessageHandle() {
+            std::cout << "MessageHandle init" << std::endl;
+        }
         // 禁止拷贝构造函数和赋值操作符，确保单例
         MessageHandle(const MessageHandle&) = delete;
         MessageHandle& operator=(const MessageHandle&) = delete;
@@ -79,41 +86,12 @@ namespace ThreadMessageQueue {
 
         void eraseSubInfo(const int& subId);
 
+        unique_ptr<ThreadPool> threadPool;
+
     private:
         mutable std::mutex mutex;
         mutable std::mutex subInfoMtx;
         std::unordered_set<void*> aliveObjects;
         std::unordered_map<int, SubInfo> subInfoMap; 
-    };
-};
-
-namespace ProcessMessageQueue {
-    class MessageHandle
-    {
-        template<typename Message>
-        friend class MessageQueue;
-        template<typename Message, typename Response>
-        friend class ServiceQueue;
-        friend class InitMessageQueue;
-
-    private:
-        // 私有构造函数，防止外部直接创建实例
-        MessageHandle() {}
-        // 禁止拷贝构造函数和赋值操作符，确保单例
-        MessageHandle(const MessageHandle&) = delete;
-        MessageHandle& operator=(const MessageHandle&) = delete;
-
-    protected:
-        static MessageHandle& getInstance() {
-            static MessageHandle instance;
-            return instance;
-        }
-
-        void setVTopic(const std::vector<std::string>& v_recvTopic);
-
-        void getVTopic(std::vector<std::string>& v_recvTopic);
-
-    private:
-        std::vector<std::string> v_recv_topic;
     };
 };
