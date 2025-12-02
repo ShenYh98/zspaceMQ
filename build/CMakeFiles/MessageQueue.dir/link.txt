@@ -1,0 +1,1 @@
+/usr/bin/c++ -fPIC  -g -O0  -shared -Wl,-soname,libMessageQueue.so -o ../plug/libMessageQueue.so CMakeFiles/MessageQueue.dir/src/code/MessageQueue/MessageHandleT.cpp.o CMakeFiles/MessageQueue.dir/src/code/MessageQueue/initMessageQueueT.cpp.o CMakeFiles/MessageQueue.dir/src/code/ThreadPool/ThreadPool.cpp.o  -lpthread 

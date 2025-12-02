@@ -67,7 +67,6 @@ while [ $# -ge 1 ]; do
             ;;
 
     clean)
-            sudo rm -rf config/*
             sudo rm -rf make.sh
             exit 0
             ;;

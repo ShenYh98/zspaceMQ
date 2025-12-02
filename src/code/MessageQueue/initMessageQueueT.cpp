@@ -10,6 +10,21 @@ void InitMessageQueue::initSubscribeInfo() {
     */
 }
 
+void InitMessageQueue::configCpusAffinity(const std::vector<int>& cpus) {
+    std::lock_guard<std::mutex> lock(mutex);
+    MessageHandle::getInstance().cpus = cpus;
+}
+
+void InitMessageQueue::configTopicPath(const std::string& path) {
+    std::lock_guard<std::mutex> lock(mutex);
+    auto it = path.end() - 1;
+    if (*it == '/') {
+        MessageHandle::getInstance().topicPath = path;
+    } else {
+        MessageHandle::getInstance().topicPath = path + "/";
+    } 
+}
+
 void InitMessageQueue::destroySubscribe (void* obj) {
     std::lock_guard<std::mutex> lock(mutex);
 
