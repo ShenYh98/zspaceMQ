@@ -40,13 +40,21 @@ cd "$script_dir/build"
 
 # 根据输入的参数选择操作
 if [ -z "$2" ]; then
-  # 检查tmp目录是否存在，如果不存在则创建
-  if [ ! -d "tmp" ]; then
-      mkdir tmp
+  # 清空并重新创建 build/tmp 目录，确保没有旧的平铺头文件残留
+  if [ -d "$script_dir/build/tmp" ]; then
+    rm -rf "$script_dir/build/tmp"
   fi
+  mkdir -p "$script_dir/build/tmp"
 
-  # 递归遍历src/code目录下的所有.h文件，并复制到tmp目录
-  find $script_dir/src/code -type f \( -name "*.h" -o -name "*.hpp" \) -exec cp {} tmp \;
+  # 递归遍历src/code目录下的所有.h/.hpp文件，复制到build/tmp并保留相对路径
+  # 平铺复制除 msinttypes 外的头文件到 build/tmp（保持原先平铺行为以兼容项目的 #include "Header.h" 写法）
+  find "$script_dir/src/code" -type f \( -name "*.h" -o -name "*.hpp" \) ! -path "*/msinttypes/*" -exec cp {} "$script_dir/build/tmp" \;
+
+  # 单独复制 msinttypes 子目录，保留其子目录名为 build/tmp/msinttypes
+  if [ -d "$script_dir/src/code/xpack/rapidjson/msinttypes" ]; then
+    mkdir -p "$script_dir/build/tmp/msinttypes"
+    cp "$script_dir/src/code/xpack/rapidjson/msinttypes"/* "$script_dir/build/tmp/msinttypes/" 2>/dev/null || true
+  fi
 
   if [ -z "$compiler" ]; then
     # 进行cmake构建
