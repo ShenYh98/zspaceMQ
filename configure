@@ -23,8 +23,8 @@ Options:
   --no-prefix
     Use /opt/zspaceMQ as default install directory.
 
-  --no-tests
-    Do not build testsuites.
+  --no-example
+    Do not build example uites.
 
   clean
     Clean config and make script.
@@ -37,7 +37,7 @@ ENDHELP
 build=$(pwd)/build
 config_file=$(pwd)/config/config.properties
 
-tests=1
+example=1
 noprefix=0
 prefix=""
 compiler=""
@@ -59,8 +59,8 @@ while [ $# -ge 1 ]; do
     --no-prefix)
             noprefix=1 ;;
 
-    --no-tests)
-            tests=0 ;;
+    --no-example)
+            example=0 ;;
 
     --help)
             showhelp
@@ -109,18 +109,18 @@ else
         echo "HOST=$hostsystem" >> $config_file
     fi
 
-    if [ "$tests" -eq 1 ]; then
-        echo "TEST=$tests" >> $config_file
-        tests=1
+    if [ "$example" -eq 1 ]; then
+        echo "EXAMPLE=$example" >> $config_file
+        example=1
     else
-        echo "TEST=0" >> $config_file
+        echo "EXAMPLE=0" >> $config_file
     fi
 
     echo "Configuration saved to $config_file"
     echo "prefix:$prefix"
     echo "compiler:$compiler"
     echo "hostsystem:$hostsystem"
-    echo "tests:$tests"
+    echo "example:$example"
 
     ############ 定义生成脚本的文件名 ############
     output_script="make.sh"

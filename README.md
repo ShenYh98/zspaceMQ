@@ -23,7 +23,7 @@
 ├── LICENSE
 ├── plug                编译生成的动态库存放目录
 ├── bin                 编译生成的可执行文件存放目录
-├── test                测试程序源码
+├── example             测试程序源码
 ├── README.md
 ├── script              编译脚本目录
 │   └── make2.sh
@@ -56,7 +56,7 @@ HOST=linux
   --no-prefix
     不设置安装路径
 
-  --no-tests
+  --no-example
     不编译测试程序
 
   clean
@@ -64,7 +64,7 @@ HOST=linux
 ```
 示例:
 ```bash
-./configure CXX=aarch64-linux-gnu-g++ --host=aarch64-linux-gnu --prefix=/opt/zspaceMQ/ --no-tests
+./configure CXX=aarch64-linux-gnu-g++ --host=aarch64-linux-gnu --prefix=/opt/zspaceMQ/ --no-example
 ```
 
 ## 运行编译脚本编译
@@ -86,5 +86,5 @@ csdn有关于接口的详细使用教程，链接如下：
 [zspaceMQ一款linux平台下轻量的C++消息队列组件](https://blog.csdn.net/qq_44027819/article/details/145253901?spm=1001.2014.3001.5502)
 
 ## 致谢
-Linux下C++消息队列zspaceMQ
+代码使用开源解析库xyz347/xpack，感谢作者！
 问题反馈邮箱：907184203@qq.com

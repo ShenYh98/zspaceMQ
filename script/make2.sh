@@ -13,7 +13,7 @@ script_dir="$1"
 install_dir=""
 compiler=""
 hostsystem=""
-test=""
+example=""
 config_file=$script_dir/config/config.properties
 # 从配置文件中读取安装目录
 if [ -f "$config_file" ]; then
@@ -24,8 +24,8 @@ if [ -f "$config_file" ]; then
     compiler=$CXX
     echo "Using HOST: $HOST"
     hostsystem=$HOST
-    echo "Using TEST: $TEST"
-    test=$TEST
+    echo "Using EXAMPLE: $EXAMPLE"
+    example=$EXAMPLE
 else
     echo "Config file not found: $config_file"
     exit 1
@@ -58,7 +58,7 @@ if [ -z "$2" ]; then
 
   if [ -z "$compiler" ]; then
     # 进行cmake构建
-    cmake -DCMAKE_INSTALL_PREFIX=$install_dir -DCOMPILE_TYPE="$2" -DTEST_RESULT="$test" ..
+    cmake -DCMAKE_INSTALL_PREFIX=$install_dir -DCOMPILE_TYPE="$2" -DTEST_RESULT="$example" ..
 
     # 检查cmake是否成功
     if [ $? -eq 0 ]; then
@@ -80,7 +80,7 @@ if [ -z "$2" ]; then
     fi
 
     # 进行cmake构建
-    cmake -DCMAKE_INSTALL_PREFIX=$install_dir -DCOMPILE_TYPE="$hostsystem" -DTEST_RESULT="$test" ..
+    cmake -DCMAKE_INSTALL_PREFIX=$install_dir -DCOMPILE_TYPE="$hostsystem" -DTEST_RESULT="$example" ..
 
     # 检查cmake是否成功
     if [ $? -eq 0 ]; then
