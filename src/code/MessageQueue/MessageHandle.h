@@ -5,6 +5,7 @@
 #include <iostream>
 #include <unordered_set>
 #include <unordered_map>
+#include <memory>
 
 #include "ThreadPool.h"
 
@@ -59,7 +60,7 @@ namespace ThreadMessageQueue {
 
     private:
         // 私有构造函数，防止外部直接创建实例
-        MessageHandle() {}
+        MessageHandle() { threadPool = std::make_unique<CommonLib::ThreadPool>(THREAD_MIN, THREAD_MAX); }
         // 禁止拷贝构造函数和赋值操作符，确保单例
         MessageHandle(const MessageHandle&) = delete;
         MessageHandle& operator=(const MessageHandle&) = delete;

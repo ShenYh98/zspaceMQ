@@ -68,11 +68,6 @@ install(FILES ${INCLUDE_FILES} DESTINATION include)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/src/code/xpack DESTINATION include)
 
 if(TEST_RESULT EQUAL 1)
-	add_subdirectory(example/test1)
-	add_subdirectory(example/test2)
-	# 检查是否存在protobuf库, 有protobuf库才能编译
-	if(EXISTS /opt/protobuf/)
-		add_subdirectory(example/test3)
-		add_subdirectory(example/test4)
-	endif()
+	add_subdirectory(example/fork)
+	add_subdirectory(example/thread)
 endif()

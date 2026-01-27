@@ -2,14 +2,6 @@
 
 using namespace ThreadMessageQueue;
 
-void InitMessageQueue::initSubscribeInfo() {
-    // 在一定时间内,等待接收所有消息队列话题
-    /*
-    execForPeriodTime(10, [&](time_t*){
-    });
-    */
-}
-
 void InitMessageQueue::configCpusAffinity(const std::vector<int>& cpus) {
     std::lock_guard<std::mutex> lock(mutex);
     MessageHandle::getInstance().cpus = cpus;

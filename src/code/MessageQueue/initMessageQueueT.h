@@ -18,9 +18,6 @@ namespace ThreadMessageQueue {
             return instance;
         }
 
-        // TODO 线程初始化消息队列暂时用不到,后期补充
-        void initSubscribeInfo();
-
         void destroySubscribe (void* obj);
 
         void configCpusAffinity(const std::vector<int>& cpus);
