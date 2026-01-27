@@ -1,0 +1,8 @@
+# 忽略文件夹
+bin/
+build/
+plug/
+config/
+
+# 忽略文件
+make.sh
