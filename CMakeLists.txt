@@ -68,6 +68,7 @@ install(FILES ${INCLUDE_FILES} DESTINATION include)
 install(DIRECTORY ${CMAKE_SOURCE_DIR}/src/code/xpack DESTINATION include)
 
 if(TEST_RESULT EQUAL 1)
-	add_subdirectory(example/fork)
+	add_subdirectory(example/fork/subscribe)
+	add_subdirectory(example/fork/publish)
 	add_subdirectory(example/thread)
 endif()

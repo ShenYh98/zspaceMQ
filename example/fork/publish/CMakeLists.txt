@@ -8,17 +8,17 @@ file(GLOB_RECURSE LIBRARIES
 
 # 递归添加源文件
 file(GLOB_RECURSE SOURCES 
-	${CMAKE_SOURCE_DIR}/example/fork/*.cpp
+	${CMAKE_SOURCE_DIR}/example/fork/publish/*.cpp
 	${CMAKE_SOURCE_DIR}/src/code/*.cpp
 )
 
 # 添加头文件搜索路径
 include_directories(
-	${CMAKE_SOURCE_DIR}/example/fork
+	${CMAKE_SOURCE_DIR}/example/fork/publish
 	${CMAKE_SOURCE_DIR}/build/tmp
 )
 
 # 生成可执行文件
-add_executable(test1 ${SOURCES} ${CMAKE_SOURCE_DIR}/example/fork/main.cpp)
+add_executable(forkPub ${SOURCES} ${CMAKE_SOURCE_DIR}/example/fork/publish/forkPublish.cpp)
 
-target_link_libraries(test1 pthread ${LIBRARIES})
+target_link_libraries(forkPub pthread ${LIBRARIES})
