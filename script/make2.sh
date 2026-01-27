@@ -47,13 +47,12 @@ if [ -z "$2" ]; then
   mkdir -p "$script_dir/build/tmp"
 
   # 递归遍历src/code目录下的所有.h/.hpp文件，复制到build/tmp并保留相对路径
-  # 平铺复制除 msinttypes 外的头文件到 build/tmp（保持原先平铺行为以兼容项目的 #include "Header.h" 写法）
-  find "$script_dir/src/code" -type f \( -name "*.h" -o -name "*.hpp" \) ! -path "*/msinttypes/*" -exec cp {} "$script_dir/build/tmp" \;
+  find "$script_dir/src/code" -type f \( -name "*.h" -o -name "*.hpp" \) ! -path "*/xpack/*" -exec cp {} "$script_dir/build/tmp" \;
 
-  # 单独复制 msinttypes 子目录，保留其子目录名为 build/tmp/msinttypes
-  if [ -d "$script_dir/src/code/xpack/rapidjson/msinttypes" ]; then
-    mkdir -p "$script_dir/build/tmp/msinttypes"
-    cp "$script_dir/src/code/xpack/rapidjson/msinttypes"/* "$script_dir/build/tmp/msinttypes/" 2>/dev/null || true
+  # 单独复制 xpack 子目录，保留其子目录名为 build/tmp/xpack
+  if [ -d "$script_dir/src/code/xpack" ]; then
+    mkdir -p "$script_dir/build/tmp/xpack"
+    cp -r "$script_dir/src/code/xpack"/* "$script_dir/build/tmp/xpack/" 2>/dev/null || true
   fi
 
   if [ -z "$compiler" ]; then

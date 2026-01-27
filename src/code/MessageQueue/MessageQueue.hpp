@@ -25,9 +25,7 @@
 #include "DequeCache.hpp"
 #include "MessageHandle.h"
 
-/* TODO 暂时屏蔽
 #include "xpack/json.h"
-*/
 
 /* 第一版线程间通信的消息队列(单线程通信,无法进程间通信) */
 namespace ThreadMessageQueue {
@@ -387,11 +385,9 @@ namespace ThreadMessageQueue {
             }
             buffer[bytesRead] = '\0';
 
-            /* TODO 暂时屏蔽
             Message data;
             xpack::json::decode(buffer, data); // JSON转结构体
             callback(data);
-            */
             
             return true;
         }
@@ -481,10 +477,8 @@ namespace ThreadMessageQueue {
                 return;
             }
 
-            /* TODO 暂时屏蔽
-            string data = xpack::json::encode(message); // 结构体转JSON
-            */
-            string data = ""; // TODO 临时定义
+            string data = "";
+            data = xpack::json::encode(message); // 结构体转JSON
 
             // 广播消息给所有客户端
             std::lock_guard<std::mutex> lock(clientsMutex);
@@ -819,7 +813,6 @@ namespace ThreadMessageQueue {
             } else {
                 buffer[bytesRead] = '\0';
 
-                /* TODO 暂时屏蔽
                 Message data;
                 Response response;
                 xpack::json::decode(buffer, data); // JSON转结构体
@@ -831,7 +824,6 @@ namespace ThreadMessageQueue {
                 if (bytesSent <= 0) {
                 } else {
                 }
-                */
             }
 
             return true;
@@ -927,10 +919,8 @@ namespace ThreadMessageQueue {
                 return false;
             }
 
-            /* TODO 暂时屏蔽
-            string data = xpack::json::encode(message); // 结构体转JSON
-            */
-            string data = ""; // TODO 临时定义
+            string data = "";
+            data = xpack::json::encode(message); // 结构体转JSON
 
             std::lock_guard<std::mutex> lock(clientsMutex);
             // 检查客户端连接是否仍然有效
@@ -973,9 +963,7 @@ namespace ThreadMessageQueue {
                     }
                 } else {
                     ack[bytesRecv] = '\0';
-                    /* TODO 暂时屏蔽
                     xpack::json::decode(ack, response); // JSON转结构体
-                    */
                 }
 
                 // 恢复默认超时设置（阻塞模式）

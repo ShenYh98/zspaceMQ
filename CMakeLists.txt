@@ -56,8 +56,16 @@ target_link_libraries(MessageQueue PRIVATE pthread)
 # 安装库文件到 lib 目录
 install(TARGETS MessageQueue DESTINATION lib)
  
+# 避免把整个xpack子目录内的文件一个个平铺到include根目录，将xpack文件移除
+set(INCLUDE_FILES "")
+foreach(_h ${INCLUDE})
+	if(NOT _h MATCHES ".*/xpack/.*")
+		list(APPEND INCLUDE_FILES ${_h})
+	endif()
+endforeach()
 # 安装头文件到 include 目录
-install(FILES ${INCLUDE} DESTINATION include)
+install(FILES ${INCLUDE_FILES} DESTINATION include)
+install(DIRECTORY ${CMAKE_SOURCE_DIR}/src/code/xpack DESTINATION include)
 
 if(TEST_RESULT EQUAL 1)
 	add_subdirectory(example/test1)
